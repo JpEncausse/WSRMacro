@@ -1,0 +1,18 @@
+<grammar version="1.0" xml:lang="fr-FR" mode="voice" root="ruleCalendar" xmlns="http://www.w3.org/2001/06/grammar" tag-format="semantics/1.0">
+  <rule id="ruleCalendar">
+    <example>Sarah qu'est ce qui est prévu aujourd'hui ?</example>
+    <tag>out.action=new Object(); </tag>
+    <item repeat="0-1">Sarah</item>
+    <one-of>
+      <item>qu'est ce qui est prévu</item>
+      <item>quelle est le planning</item>
+      <item>est ce que j'ai des rendez-vous</item>
+    </one-of>
+    <one-of>
+      <item>aujourd'hui <tag>out.date="today";</tag></item>
+      <item>demain <tag>out.date="tomorrow";</tag></item>
+    </one-of>
+    <item repeat="0-1">Sarah</item>
+    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/calendar";</tag>
+  </rule>
+</grammar>
