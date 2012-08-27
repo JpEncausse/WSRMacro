@@ -39,6 +39,7 @@
   <ItemGroup>
     <Content Include="macros\calendar.xml" />
     <None Include="macros\fr-FR.grxml" />
+    <Content Include="macros\karotz.xml" />
     <Content Include="macros\movie.xml">
       <SubType>Designer</SubType>
     </Content>

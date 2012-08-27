@@ -1,3 +1,3 @@
 Under Heavy Developpement
 
-Search SARAH on http://www.encausse.net for more information
+http://goo.gl/cJ23a for more information
