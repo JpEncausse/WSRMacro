@@ -1,4 +1,14 @@
-<grammar version="1.0" xml:lang="fr-FR" mode="voice" root="ruleCalendar"  tag-format="semantics/1.0" xmlns="http://www.w3.org/2001/06/grammar" xmlns:sapi="http://schemas.microsoft.com/Speech/2002/06/SRGSExtensions">
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+****************************************************************
+** Copyright (c) Microsoft Corporation. All rights reserved. **
+****************************************************************
+The example phone numbers, social security numbers, and credit card numbers depicted
+in the examples herein are fictitious. No association with any real company, organization,
+product, domain name, email address, logo, person, places, or events is intended or should be
+inferred.
+-->
+<grammar xml:lang="fr-FR" mode="voice" version="1.0" xmlns="http://www.w3.org/2001/06/grammar" tag-format="semantics/1.0" root="ruleEmpty">
   <tag>
     <![CDATA[
     function IsValidDate(month, day, year) 
@@ -140,69 +150,10 @@
   }
   ]]>
   </tag>
-
-  <!-- ========================================== -->
-
-  <rule id="ruleCalendar">
-    <tag>out.action=new Object(); </tag>
-    <one-of>
-      <item><ruleref uri="#ruleCheckEvent"/><tag>out.action = rules.ruleCheckEvent;</tag></item>
-      <item><ruleref uri="#ruleAddEvent"/><tag>out.action = rules.ruleAddEvent;</tag></item>
-      <item><ruleref uri="#ruleAddReminder"/><tag>out.action = rules.ruleAddReminder;</tag></item>
-    </one-of>
-    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/calendar";</tag>
-  </rule>
   
-  <rule id="ruleCheckEvent">
-    <example>Sarah qu'est ce qui est prévu aujourd'hui ?</example>
-    <tag>out.action=new Object(); </tag>
-    <item>Sarah</item>
-    <one-of>
-      <item>qu'est ce qui est prévu</item>
-      <item>quelle est le planning</item>
-      <item>est ce que j'ai des rendez-vous</item>
-    </one-of>
-    <one-of>
-      <item>aujourd'hui <tag>out.date="today";</tag></item>
-      <item>demain <tag>out.date="tomorrow";</tag></item>
-    </one-of>
+  <rule id="ruleEmpty" scope="public">
+    <ruleref special="VOID"/>
   </rule>
-
-  <rule id="ruleAddEvent">
-    <example>Sarah ajoute un évènement: demain 17h26</example>
-    <tag>out._attributes = {}</tag>
-    <one-of>
-      <item>Sarah crée un</item>
-      <item>Sarah ajoute un</item>
-    </one-of>
-    <one-of>
-      <item>rendez-vous <tag>out.dictation = "Rendez-Vous"</tag></item>
-      <item>rappel <tag>out.dictation = "Rappel"</tag></item>
-      <item>évènement
-        <tag>out._attributes.tts = "Oui, avec quel titre ?"</tag>
-        <tag>out._attributes.dictation = "true"</tag>
-      </item>
-    </one-of>
-    <item repeat="0-1"><ruleref uri="#Date" /><tag>out.date = rules.latest()</tag></item>
-    <item repeat="0-1"><ruleref uri="#Time" /><tag>out.time = rules.latest()</tag></item>
-  </rule>
-
-  <rule id="ruleAddReminder">
-    <example>Sarah préviens moi dans un quart d'heure</example>
-    <tag>out._attributes = {}</tag>
-    <one-of>
-      <item>Sarah préviens moi dans</item>
-      <item>Sarah rappel moi dans</item>
-    </one-of>
-    <one-of>
-      <item><ruleref uri="#Time_Hour" /><tag>out.hour = rules.latest()</tag></item>
-      <item><ruleref uri="#Time_Minute" /><tag>out.minute = rules.latest()</tag></item>
-    </one-of>  
-    <tag>out.dictation = "Mémento"</tag>
-    <tag>out.relativeTime = "true"</tag>
-  </rule>
-  
-  <!-- ========================================== -->
   
   <!--    
 	Category: Cardinal
@@ -861,7 +812,7 @@
       </item>
     </one-of>
   </rule>
-
+  
   <!--Digits-->
 
   <rule id="Digits" scope="public">
@@ -891,25 +842,25 @@
 
   <rule id="Cardinal_1_MF" scope="public">
     <one-of>
-      <item> un </item>
-      <item> une </item>
+       <item> un </item>
+       <item> une </item>
     </one-of>
   </rule>
-
+  
   <rule id="PHONE_TAG_Cardinal_1_MF" scope="public">
     <one-of>
-      <item> un </item>
+       <item> un </item>
     </one-of>
   </rule>
+  
+<!-- DO NOT EDIT (expanded from "expand_source_A.xml"): -->
 
-  <!-- DO NOT EDIT (expanded from "expand_source_A.xml"): -->
-
-  <!--
+<!--
 This code will be forked to two files which then will be macro-expanded into the main library file.
 -->
 
 
-  <rule id="DigitBlock_2Digits" scope="public">
+<rule id="DigitBlock_2Digits" scope="public">
     <example> sept trois </example>
     <example> trente-six </example>
     <tag>out._value = ""; </tag>
@@ -953,7 +904,7 @@ This code will be forked to two files which then will be macro-expanded into the
     </one-of>
   </rule>
 
-
+  
   <!-- out.Cardinal_1_to_9: integer -->
   <rule id="Cardinal_1_to_9" scope="public">
     <example> trois </example>
@@ -967,7 +918,7 @@ This code will be forked to two files which then will be macro-expanded into the
       </item>
     </one-of>
   </rule>
-
+  
   <!-- out.Cardinal_20_to_99: integer -->
   <rule id="Cardinal_20_to_99" scope="public">
     <example> vingt </example>
@@ -1149,15 +1100,15 @@ This code will be forked to two files which then will be macro-expanded into the
       </item>
     </one-of>
   </rule>
-  <!-- END OF EXPANSION (expanded from "expand_source_A.xml"): -->
-  <!-- DO NOT EDIT (expanded from "expand_source_Phone.xml"): -->
+<!-- END OF EXPANSION (expanded from "expand_source_A.xml"): -->
+<!-- DO NOT EDIT (expanded from "expand_source_Phone.xml"): -->
 
-  <!--
+<!--
 This code will be forked to two files which then will be macro-expanded into the main library file.
 -->
 
 
-  <rule id="PHONE_TAG_DigitBlock_2Digits" scope="public">
+<rule id="PHONE_TAG_DigitBlock_2Digits" scope="public">
     <example> sept trois </example>
     <example> trente-six </example>
     <tag>out._value = ""; </tag>
@@ -1201,7 +1152,7 @@ This code will be forked to two files which then will be macro-expanded into the
     </one-of>
   </rule>
 
-
+  
   <!-- out.Cardinal_1_to_9: integer -->
   <rule id="PHONE_TAG_Cardinal_1_to_9" scope="public">
     <example> trois </example>
@@ -1215,7 +1166,7 @@ This code will be forked to two files which then will be macro-expanded into the
       </item>
     </one-of>
   </rule>
-
+  
   <!-- out.Cardinal_20_to_99: integer -->
   <rule id="PHONE_TAG_Cardinal_20_to_99" scope="public">
     <example> vingt </example>
@@ -1397,7 +1348,7 @@ This code will be forked to two files which then will be macro-expanded into the
       </item>
     </one-of>
   </rule>
-  <!-- END OF EXPANSION (expanded from "expand_source_Phone.xml"): -->
+<!-- END OF EXPANSION (expanded from "expand_source_Phone.xml"): -->
 
   <rule id="DigitBlock_3Digits" scope="public">
     <example> un deux trois </example>
@@ -1526,7 +1477,7 @@ This code will be forked to two files which then will be macro-expanded into the
   </rule>
 
   <!--Date_Day-->
-
+  
   <rule id="Date_Day" scope="public">
     <example> lundi le vingt  </example>
     <tag>
@@ -1938,12 +1889,12 @@ This code will be forked to two files which then will be macro-expanded into the
       </item>
     </one-of>
   </rule>
-
+  
   <!--Date_Year-->
 
   <rule id="Date_Year" scope="public">
     <example> deux mille un</example>
-    <tag>
+   <tag>
       out.Year = new Object();
       var offset = 1;
       out.AlternateYear = new Object();
@@ -2080,7 +2031,7 @@ This code will be forked to two files which then will be macro-expanded into the
           offset = rules.Time_HourNum_2_to_11;
           out.Hour._value = Hour24(offset, "");
           out.Hour._attributes.name = "Assumed";
-        </tag>
+         </tag>
         <ruleref uri="#Time_Minute" />
         <tag>
           out.Minute._value = rules.Time_Minute;
@@ -2142,7 +2093,7 @@ This code will be forked to two files which then will be macro-expanded into the
           out.Hour._value = 0;
           out.Hour._attributes.name = "Explicit";
           out.Minute._value = 0;
-
+          
         </tag>
       </item>
       <item>
@@ -2298,7 +2249,7 @@ This code will be forked to two files which then will be macro-expanded into the
       </item>
       <item>
         et demie
-        <tag>   out.Minute._value = 30; out.Hour._value = 0;</tag>
+       <tag>   out.Minute._value = 30; out.Hour._value = 0;</tag>
       </item>
       <item>
         moins  <ruleref uri="#Time_Minute" />
@@ -2412,7 +2363,7 @@ This code will be forked to two files which then will be macro-expanded into the
   </rule>
 
   <!-- out.PhoneNumber_LocalNumber._value: string  -->
-  <rule id="PhoneNumber_LocalNumber" scope="public">
+   <rule id="PhoneNumber_LocalNumber" scope="public">
     <example> zéro zéro sept trois trente-six trente-six </example>
     <tag> out._value = "";</tag>
     <one-of>

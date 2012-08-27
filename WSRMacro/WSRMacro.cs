@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Speech;
 using System.Speech.Recognition;
 using System.Speech.Synthesis;
 using System.IO;
@@ -6,6 +7,7 @@ using System.Xml.XPath;
 using System.Net;
 using System.Threading;
 using System.Text;
+using System.Web;
 
 namespace encausse.net
 {
@@ -49,7 +51,10 @@ namespace encausse.net
         // -----------------------------------------
 
         private double CONFIDENCE = 0.82;
+        private double CONFIDENCE_DICTATION = 0.4;
+
         private SpeechRecognitionEngine recognizer = null;
+        DictationGrammar dication = null;
 
         private String directory = null;
         private String abspath   = null; // Resolved absolute path
@@ -58,6 +63,8 @@ namespace encausse.net
         private int loading = 0;       // Files to load
         private Boolean load = false;  // Flags to trigger load;
         private Boolean start = false; // Recognizer status
+
+        private String dictationUrl = null; // Last dication URL
 
         // -----------------------------------------
         //  WSRMacro CONSTRUCTOR
@@ -74,7 +81,12 @@ namespace encausse.net
         // -----------------------------------------
 
         public Grammar GetGrammar(String file) {
+
+            // Uri baseURI = baseURI = new Uri(@"file://E:\Dropbox\Projects\WSRMacro\WSRMacro\macros");
+            // Grammar grammar = new Grammar(new FileStream(file, FileMode.Open), null, baseURI);
             Grammar grammar = new Grammar(file);
+            grammar.Enabled = true;
+
             return grammar;
         }
 
@@ -103,11 +115,18 @@ namespace encausse.net
             // Load Grammar
             DirectoryInfo dir = new DirectoryInfo(directory);
             abspath = dir.FullName;
+
             Console.WriteLine("[Grammar] Load directory: " + abspath);
             foreach (FileInfo f in dir.GetFiles("*.xml")) {
                 this.loading++;
                 LoadGrammar(f.FullName, f.Name);
             }
+
+            // Add a Dictation Grammar
+            dication = new DictationGrammar("grammar:dictation");
+            dication.Name = "dictation";
+            dication.Enabled = false;
+            GetEngine().LoadGrammarAsync(dication);
         }
 
         public void SetGrammar(String directory) {
@@ -176,7 +195,7 @@ namespace encausse.net
             // http://social.msdn.microsoft.com/Forums/en-US/kinectsdkaudioapi/thread/f184a652-a63f-4c72-a807-f9770fdf57f8
 
             Console.WriteLine("[Engine] Init recognizer");
-            recognizer = new SpeechRecognitionEngine();
+            recognizer = new SpeechRecognitionEngine(new System.Globalization.CultureInfo("fr-FR"));
 
             // Add a handler for the LoadGrammarCompleted event.
             recognizer.LoadGrammarCompleted += new EventHandler<LoadGrammarCompletedEventArgs>(recognizer_LoadGrammarCompleted);
@@ -202,7 +221,7 @@ namespace encausse.net
             Console.WriteLine("EndSilenceTimeoutAmbiguous: {0}", recognizer.EndSilenceTimeoutAmbiguous);
 
             // Set Max Alternate to 0
-            recognizer.MaxAlternates = 0;
+            //recognizer.MaxAlternates = 0;
             Console.WriteLine("MaxAlternates: {0}", recognizer.MaxAlternates);
 
             // Set the input to the recognizer.
@@ -213,7 +232,7 @@ namespace encausse.net
 
         // See also: http://msdn.microsoft.com/en-us/library/ms554584.aspx
         public void StartRecognizer() {
-            
+
             // Request a loading of grammar
             if (this.load){
               this.load = false;
@@ -244,32 +263,55 @@ namespace encausse.net
         //  WSRMacro HTTP
         // ------------------------------------------
 
-        protected String GetURL(RecognitionResult result) {
-            // Parse Semantics
-            XPathNavigator xnav = result.ConstructSmlFromSemantics().CreateNavigator();
-            Console.WriteLine(xnav.OuterXml);
+        protected Boolean hasDictation(XPathNavigator xnav) {
+            XPathNavigator dictation = xnav.SelectSingleNode("/SML/action/@dictation");
+            if (dictation == null) { return false; }
 
-            // Build URI
-            String url = xnav.SelectSingleNode("/SML/action/@uri").Value;
+            dication.Enabled = true;
+            return true;
+        }
 
-            // Build QueryString
-            String prefix = "?";
-            XPathNodeIterator it = xnav.Select("/SML/action/*");
+        protected String GetResultTTS(XPathNavigator xnav) {
+            XPathNavigator tts = xnav.SelectSingleNode("/SML/action/@tts");
+            if (tts != null) { return tts.Value; }
+            return null;
+        }
+
+        protected String BuildResultURL(XPathNodeIterator it) {
+            String qs = "";
             while (it.MoveNext()) {
+                String children = "";
                 if (it.Current.Name == "confidence") continue;
                 if (it.Current.Name == "uri") continue;
-                url += prefix + it.Current.Name + "=" + it.Current.Value;
-                prefix = "&";
+                
+                if (it.Current.HasChildren) {
+                    children = BuildResultURL(it.Current.SelectChildren(String.Empty, it.Current.NamespaceURI));
+                }
+                qs += (children == "") ? (it.Current.Name + "=" + it.Current.Value + "&") : (children);
             }
+            return qs;
+        }
+        
+        protected String GetResultURL(XPathNavigator xnav) {
+            XPathNavigator xurl = xnav.SelectSingleNode("/SML/action/@uri");
+            if (xurl == null) { return null; }
+
+            // Build URI
+            String url = xurl.Value + "?";
+
+            // Build QueryString
+            url += BuildResultURL(xnav.Select("/SML/action/*"));
 
             // Append Directory Path
-            url += prefix + "directory=" + abspath;
+            url += "directory=" + abspath;
 
             return url;
         }
 
         protected void SendRequest(String url) {
             if (url == null) { return; }
+
+            Console.WriteLine("[HTTP] Build HttpRequest: " + url);
 
             HttpWebRequest req = (HttpWebRequest) WebRequest.Create(url);
             req.Method = "GET";
@@ -281,7 +323,7 @@ namespace encausse.net
                 Console.WriteLine("[HTTP] Response status: {0}", res.StatusCode);
 
                 using (StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8)){
-                  say(sr.ReadToEnd());
+                  Say(sr.ReadToEnd());
                 }
             }
             catch (WebException ex){
@@ -293,7 +335,9 @@ namespace encausse.net
         //  WSRMacro SPEECH
         // -----------------------------------------
 
-        public void say(String tts) {
+        public void Say(String tts) {
+            if (tts == null) { return; }
+
             Console.WriteLine("[TTS] Say: {0}", tts);
             using (SpeechSynthesizer synthesizer = new SpeechSynthesizer()) {
 
@@ -322,20 +366,61 @@ namespace encausse.net
         protected void recognizer_SpeechRecognized(object sender, SpeechRecognizedEventArgs e) {
             RecognitionResult rr = e.Result;
 
+            // 1. Handle dictation mode
+            if (this.dication.Enabled) {
+                if (rr.Confidence < CONFIDENCE_DICTATION) {
+                    Console.WriteLine("[Engine] Dictation rejected: " + rr.Confidence + " Text: " + rr.Text);
+                    return;
+                }
+
+                Console.WriteLine("[Engine] Dictation recognized: " + rr.Confidence + " Text: " + rr.Text);
+
+                // Stop dictation
+                this.dication.Enabled = false;
+
+                // Send previous request with dication
+                String dication = System.Uri.EscapeDataString(rr.Text);
+                SendRequest(this.dictationUrl + "&dictation=" + dication);
+
+                this.dictationUrl = null;
+                return;
+            }
+
+            // 2. Handle speech mode
             if (rr.Confidence < CONFIDENCE) {
                 Console.WriteLine("[Engine] Speech rejected: " + rr.Confidence + " Text: " + rr.Text);
                 return;
             }
 
             Console.WriteLine("[Engine] Speech recognized: " + rr.Confidence + " Text: " + rr.Text);
-            SendRequest(GetURL(rr));
+            
+            // Build XPath navigator
+            XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
+            Console.WriteLine(xnav.OuterXml);
+
+            // Parse Result's TTS
+            String tts = GetResultTTS(xnav);
+            Say(tts);
+
+            // Parse Result's URL and send Request
+            String url = GetResultURL(xnav);
+
+            // Parse Result's Dication
+            if (hasDictation(xnav)) {
+                this.dictationUrl = url; 
+                return;
+            }
+
+            // Otherwise send the request
+            SendRequest(url);
         }
 
         // Handle the SpeechRecognized event.
         protected void recognizer_RecognizeCompleted(object sender, RecognizeCompletedEventArgs e) {
-            Console.WriteLine("[Engine] RecognizeCompleted ({0}):", DateTime.Now.ToString("mm:ss.f"));
+
             string resultText = e.Result != null ? e.Result.Text : "<null>";
-            // Console.WriteLine("[Engine]  BabbleTimeout: {0}; InitialSilenceTimeout: {1}; Result text: {2}", e.BabbleTimeout, e.InitialSilenceTimeout, resultText);
+            Console.WriteLine("[Engine] RecognizeCompleted ({0}): {1}", DateTime.Now.ToString("mm:ss.f"), resultText);
+         // Console.WriteLine("[Engine]  BabbleTimeout: {0}; InitialSilenceTimeout: {1}; Result text: {2}", e.BabbleTimeout, e.InitialSilenceTimeout, resultText);
             this.start = false;
             StartRecognizer();
         }

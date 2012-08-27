@@ -12,7 +12,7 @@
   <rule id="ruleMoviePlace">
     <example>Sarah qu'est ce qu'il y a au ciné à Vaucresson ?</example>
     <tag>out.place="B0099"; </tag>
-    <item repeat="0-1">Sarah</item>
+    <item>Sarah</item>
     <one-of>
       <item>il y a quoi au ciné</item>
       <item>il y a quoi au cinéma</item>
@@ -32,32 +32,28 @@
         <item>à vaucresson<tag>out.place="B0099";</tag></item>
       </one-of>
     </item>
-    <item repeat="0-1">Sarah</item>
   </rule>
 
   <rule id="ruleMovieTime">
     <example>Sarah a quelle heure passe Eureka ?</example>
     
-    <item repeat="0-1">Sarah</item>
+    <item>Sarah</item>
     <one-of>
       <item>a quelle heure passe</item>
       <item>quand passe</item>
       <item>quelle sont les séances pour</item>
     </one-of>
     <ruleref uri="#ruleMovieName"/>
-    <item repeat="0-1">Sarah</item>
   </rule>
   
 <!-- Automatic Generation § -->
 <rule id="ruleMovieName">
-  <tag>out.place="B0172";</tag>
+  <tag>out.place="B0099";</tag>
   <one-of>
-    <item>Abraham Lincoln <tag>out.movie="0";</tag></item>
-    <item>Sexy Dance 4<tag>out.movie="1";</tag></item>
-    <item>Rebelle<tag>out.movie="2";</tag></item>
-    <item>The Dark Knight Rises<tag>out.movie="3";</tag></item>
-    <item>L'Âge de glace <tag>out.movie="4";</tag></item>
-    <item>Le Lorax<tag>out.movie="5";</tag></item>
+    <item>Cornouaille<tag>out.movie="0";</tag></item>
+    <item>Comme un homme<tag>out.movie="1";</tag></item>
+    <item>Les Saphirs<tag>out.movie="2";</tag></item>
+    <item>Jusqu'à ce que la fin du monde nous sépare<tag>out.movie="3";</tag></item>
   </one-of>
 </rule>
 <!-- § Automatic Generation -->
