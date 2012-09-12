@@ -2,6 +2,7 @@
 using System.Speech;
 using System.Speech.Recognition;
 using System.Speech.Synthesis;
+using System.Speech.AudioFormat;
 using System.IO;
 using System.Xml.XPath;
 using System.Net;
@@ -27,7 +28,7 @@ namespace encausse.net
         // -----------------------------------------
         //  MAIN
         // -----------------------------------------
-
+        /*
         static void Main(string[] args){
 
             String directory = "macros";
@@ -45,7 +46,7 @@ namespace encausse.net
             // Keep the console window open.
             Console.ReadLine();
         }
-
+        */
         // -----------------------------------------
         //  WSRMacro VARIABLES
         // -----------------------------------------
@@ -283,9 +284,8 @@ namespace encausse.net
                 String children = "";
                 if (it.Current.Name == "confidence") continue;
                 if (it.Current.Name == "uri") continue;
-                
                 if (it.Current.HasChildren) {
-                    children = BuildResultURL(it.Current.SelectChildren(String.Empty, it.Current.NamespaceURI));
+                  children = BuildResultURL(it.Current.SelectChildren(String.Empty, it.Current.NamespaceURI));
                 }
                 qs += (children == "") ? (it.Current.Name + "=" + it.Current.Value + "&") : (children);
             }
@@ -298,6 +298,7 @@ namespace encausse.net
 
             // Build URI
             String url = xurl.Value + "?";
+            url = url.Replace("http://127.0.0.1:", "http://192.168.0.8:");
 
             // Build QueryString
             url += BuildResultURL(xnav.Select("/SML/action/*"));
@@ -306,6 +307,15 @@ namespace encausse.net
             url += "directory=" + abspath;
 
             return url;
+        }
+
+        protected double GetResultThreashold(XPathNavigator xnav) {
+          XPathNavigator level = xnav.SelectSingleNode("/SML/action/@threashold");
+          if (level != null) {
+            Console.WriteLine("Setting confidence level: " + level.Value);
+            return level.ValueAsDouble; 
+          }
+          return CONFIDENCE;
         }
 
         protected void SendRequest(String url) {
@@ -387,15 +397,17 @@ namespace encausse.net
             }
 
             // 2. Handle speech mode
-            if (rr.Confidence < CONFIDENCE) {
+
+            // Build XPath navigator
+            XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
+            double confidence = GetResultThreashold(xnav);
+
+            if (rr.Confidence < confidence) {
                 Console.WriteLine("[Engine] Speech rejected: " + rr.Confidence + " Text: " + rr.Text);
                 return;
             }
 
             Console.WriteLine("[Engine] Speech recognized: " + rr.Confidence + " Text: " + rr.Text);
-            
-            // Build XPath navigator
-            XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
             Console.WriteLine(xnav.OuterXml);
 
             // Parse Result's TTS

@@ -2,13 +2,13 @@
   <rule id="ruleTime" scope="public">
     <example>Sarah il est quelle heure ?</example>
     <tag>out.action=new Object(); </tag>
-    <item>Sarah</item> 
     <one-of>
-      <item>il est quelle heure</item>
-      <item>quelle heure est il</item>
-      <item>peux tu me donner l'heure</item>
-      <item>tu peux me donner l'heure</item>
+      <item>Sarah il est quelle heure</item>
+      <item>Sarah quelle heure est il</item>
+      <item>Sarah peux tu me donner l'heure</item>
+      <item>Sarah tu peux me donner l'heure</item>
     </one-of>
     <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/time";</tag>
+    <tag>out.action._attributes.threashold="0.85";</tag>
   </rule>
 </grammar>

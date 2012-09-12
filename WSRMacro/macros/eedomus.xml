@@ -1,0 +1,16 @@
+<grammar version="1.0" xml:lang="fr-FR" mode="voice" root="ruleEedomus" xmlns="http://www.w3.org/2001/06/grammar" tag-format="semantics/1.0">
+  <rule id="ruleEedomus" scope="public">
+    <example>Sarah allume la lampe du salon</example>
+    <tag>out.action=new Object(); </tag>
+    <item>Sarah</item>
+    <one-of>
+      <item>allume<tag>out.action.periphValue=100</tag></item>
+      <item>eteint<tag>out.action.periphValue=0</tag></item>
+    </one-of>
+    <one-of>
+      <item>la lampe du bureau<tag>out.action.periphId=12350</tag></item>
+      <item>la lampe du salon<tag>out.action.periphId=12350</tag></item>
+    </one-of>
+    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/eedomus";</tag>
+  </rule>
+</grammar>
