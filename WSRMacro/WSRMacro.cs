@@ -9,6 +9,7 @@ using System.Net;
 using System.Threading;
 using System.Text;
 using System.Web;
+using System.Globalization;
 
 namespace encausse.net
 {
@@ -28,7 +29,7 @@ namespace encausse.net
         // -----------------------------------------
         //  MAIN
         // -----------------------------------------
-        /*
+        
         static void Main(string[] args){
 
             String directory = "macros";
@@ -40,9 +41,15 @@ namespace encausse.net
             if (args.Length >= 2) {
                 server = args[1];
             }
+            
+            double confidence = 0.80;
+            if (args.Length >= 3) {
+              CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
+              confidence = double.Parse(args[2], culture);
+            }
          
             try {
-                WSRMacro wsr = new WSRMacro(directory, server);
+                WSRMacro wsr = new WSRMacro(directory, server, confidence);
             } 
             catch (Exception ex){
                 Console.WriteLine(ex);
@@ -51,7 +58,7 @@ namespace encausse.net
             // Keep the console window open.
             Console.ReadLine();
         }
-        */
+        
         // -----------------------------------------
         //  WSRMacro VARIABLES
         // -----------------------------------------
@@ -79,9 +86,15 @@ namespace encausse.net
 
         public WSRMacro() { }
 
-        public WSRMacro(String directory, String server) {
-            SetGrammar(directory);
+        public WSRMacro(String directory, String server, double confidence) {
+            
             this.server = server;
+            this.CONFIDENCE = confidence;
+
+            Console.WriteLine("Server IP: " + server);
+            Console.WriteLine("Confidence: " + confidence);
+
+            SetGrammar(directory);
         }
 
         // -----------------------------------------

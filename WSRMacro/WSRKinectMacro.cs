@@ -9,6 +9,7 @@ using System.Net;
 using System.Threading;
 using System.Text;
 using System.Web;
+using System.Globalization;
 using Microsoft.Kinect;
 
 namespace encausse.net
@@ -29,7 +30,7 @@ namespace encausse.net
         // -----------------------------------------
         //  MAIN
         // -----------------------------------------
-        
+        /*
         static void Main(string[] args){
 
             String directory = "macros";
@@ -42,8 +43,14 @@ namespace encausse.net
                 server = args[1];
             }
 
+            double confidence = 0.80;
+            if (args.Length >= 3) {
+              CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
+              confidence = double.Parse(args[2], culture);
+            }
+
             try {
-                WSRKinectMacro wsr = new WSRKinectMacro(directory, server);
+                WSRKinectMacro wsr = new WSRKinectMacro(directory, server, confidence);
             } 
             catch (Exception ex){
                 Console.WriteLine(ex);
@@ -52,7 +59,7 @@ namespace encausse.net
             // Keep the console window open.
             Console.ReadLine();
         }
-        
+        */
         // -----------------------------------------
         //  WSRMacro VARIABLES
         // -----------------------------------------
@@ -80,9 +87,15 @@ namespace encausse.net
 
         public WSRKinectMacro() { }
 
-        public WSRKinectMacro(String directory, String server) {
-            SetGrammar(directory);
+        public WSRKinectMacro(String directory, String server, double confidence) {
+            
             this.server = server;
+            this.CONFIDENCE = confidence;
+
+            Console.WriteLine("Server IP: " + server);
+            Console.WriteLine("Confidence: " + confidence);
+
+            SetGrammar(directory);
         }
 
         // -----------------------------------------
