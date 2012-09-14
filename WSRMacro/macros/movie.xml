@@ -48,16 +48,11 @@
   
 <!-- Automatic Generation § -->
 <rule id="ruleMovieName">
-  <tag>out.place="B0172";</tag>
+  <tag>out.place="B0099";</tag>
   <one-of>
-    <item>Jason Bourne <tag>out.movie="0";</tag></item>
-    <item>Voisins du troisième type<tag>out.movie="1";</tag></item>
-    <item>LOL USA<tag>out.movie="2";</tag></item>
-    <item>Expendables 2<tag>out.movie="3";</tag></item>
-    <item>Rebelle<tag>out.movie="4";</tag></item>
-    <item>L'Étrange pouvoir de Norman<tag>out.movie="5";</tag></item>
-    <item>The Secret<tag>out.movie="6";</tag></item>
-    <item>Premium Rush<tag>out.movie="7";</tag></item>
+    <item>Camille Redouble<tag>out.movie="0";</tag></item>
+    <item>Cherchez Hortense<tag>out.movie="1";</tag></item>
+    <item>Broken<tag>out.movie="2";</tag></item>
   </one-of>
 </rule>
 <!-- § Automatic Generation -->

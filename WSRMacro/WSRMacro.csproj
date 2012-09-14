@@ -48,6 +48,7 @@
     <Content Include="macros\karotz.xml">
       <SubType>Designer</SubType>
     </Content>
+    <Content Include="macros\meteo.xml" />
     <Content Include="macros\movie.xml">
       <SubType>Designer</SubType>
     </Content>

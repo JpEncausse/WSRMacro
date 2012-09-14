@@ -29,7 +29,7 @@ namespace encausse.net
         // -----------------------------------------
         //  MAIN
         // -----------------------------------------
-        
+        /*
         static void Main(string[] args){
 
             String directory = "macros";
@@ -58,7 +58,7 @@ namespace encausse.net
             // Keep the console window open.
             Console.ReadLine();
         }
-        
+        */
         // -----------------------------------------
         //  WSRMacro VARIABLES
         // -----------------------------------------
