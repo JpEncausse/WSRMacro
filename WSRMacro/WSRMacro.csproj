@@ -38,9 +38,13 @@
     <Compile Include="WSRMacro.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="macros\calendar.xml" />
+    <Content Include="macros\calendar.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <None Include="macros\fr-FR.grxml" />
-    <Content Include="macros\eedomus.xml" />
+    <Content Include="macros\eedomus.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="macros\karotz.xml">
       <SubType>Designer</SubType>
     </Content>

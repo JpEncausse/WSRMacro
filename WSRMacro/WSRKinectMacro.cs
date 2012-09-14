@@ -33,12 +33,17 @@ namespace encausse.net
         static void Main(string[] args){
 
             String directory = "macros";
-            if (args.Length == 1){
+            if (args.Length >= 1){
                 directory = args[0];
             }
 
+            String server = "192.168.0.8";
+            if (args.Length >= 2) {
+                server = args[1];
+            }
+
             try {
-                WSRKinectMacro wsr = new WSRKinectMacro(directory);
+                WSRKinectMacro wsr = new WSRKinectMacro(directory, server);
             } 
             catch (Exception ex){
                 Console.WriteLine(ex);
@@ -52,14 +57,15 @@ namespace encausse.net
         //  WSRMacro VARIABLES
         // -----------------------------------------
 
-        private double CONFIDENCE = 0.78;
-        private double CONFIDENCE_DICTATION = 0.4;
+        private double CONFIDENCE = 0.80;
+        private double CONFIDENCE_DICTATION = 0.30;
 
         private SpeechRecognitionEngine recognizer = null;
         DictationGrammar dication = null;
 
-        private String directory = null;
-        private String abspath   = null; // Resolved absolute path
+        private String server = "192.168.0.8";
+        private String directory  = null;
+        private String abspath    = null; // Resolved absolute path
         private FileSystemWatcher watcher = null;
         
         private int loading = 0;       // Files to load
@@ -74,8 +80,9 @@ namespace encausse.net
 
         public WSRKinectMacro() { }
 
-        public WSRKinectMacro(String directory) {
+        public WSRKinectMacro(String directory, String server) {
             SetGrammar(directory);
+            this.server = server;
         }
 
         // -----------------------------------------
@@ -84,7 +91,6 @@ namespace encausse.net
 
         public Grammar GetGrammar(String file) {
 
-            // Uri baseURI = baseURI = new Uri(@"file://E:\Dropbox\Projects\WSRMacro\WSRMacro\macros");
             // Grammar grammar = new Grammar(new FileStream(file, FileMode.Open), null, baseURI);
             Grammar grammar = new Grammar(file);
             grammar.Enabled = true;
@@ -136,6 +142,8 @@ namespace encausse.net
             if (!Directory.Exists(directory)) {
                 throw new Exception("Macro's directory do not exists: " + directory);
             }
+
+            Console.WriteLine("Using directory: " + directory);
 
             // Stop Directory Watcher
             StopDirectoryWatcher();
@@ -338,7 +346,7 @@ namespace encausse.net
 
             // Build URI
             String url = xurl.Value + "?";
-            url = url.Replace("http://127.0.0.1:", "http://192.168.0.8:");
+            url = url.Replace("http://127.0.0.1:", "http://" + server + ":");
 
             // Build QueryString
             url += BuildResultURL(xnav.Select("/SML/action/*"));

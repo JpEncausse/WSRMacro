@@ -32,12 +32,17 @@ namespace encausse.net
         static void Main(string[] args){
 
             String directory = "macros";
-            if (args.Length == 1){
+            if (args.Length >= 1){
                 directory = args[0];
             }
 
+            String server = "192.168.0.8";
+            if (args.Length >= 2) {
+                server = args[1];
+            }
+         
             try {
-                WSRMacro wsr = new WSRMacro(directory);
+                WSRMacro wsr = new WSRMacro(directory, server);
             } 
             catch (Exception ex){
                 Console.WriteLine(ex);
@@ -57,6 +62,7 @@ namespace encausse.net
         private SpeechRecognitionEngine recognizer = null;
         DictationGrammar dication = null;
 
+        private String server = "192.168.0.8";
         private String directory = null;
         private String abspath   = null; // Resolved absolute path
         private FileSystemWatcher watcher = null;
@@ -73,8 +79,9 @@ namespace encausse.net
 
         public WSRMacro() { }
 
-        public WSRMacro(String directory) {
+        public WSRMacro(String directory, String server) {
             SetGrammar(directory);
+            this.server = server;
         }
 
         // -----------------------------------------
@@ -83,7 +90,6 @@ namespace encausse.net
 
         public Grammar GetGrammar(String file) {
 
-            // Uri baseURI = baseURI = new Uri(@"file://E:\Dropbox\Projects\WSRMacro\WSRMacro\macros");
             // Grammar grammar = new Grammar(new FileStream(file, FileMode.Open), null, baseURI);
             Grammar grammar = new Grammar(file);
             grammar.Enabled = true;
@@ -298,7 +304,7 @@ namespace encausse.net
 
             // Build URI
             String url = xurl.Value + "?";
-            url = url.Replace("http://127.0.0.1:", "http://192.168.0.8:");
+            url = url.Replace("http://127.0.0.1:", "http://"+server+":");
 
             // Build QueryString
             url += BuildResultURL(xnav.Select("/SML/action/*"));
