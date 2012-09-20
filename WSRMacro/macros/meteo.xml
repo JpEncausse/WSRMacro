@@ -2,9 +2,10 @@
   <rule id="ruleMeteo" scope="public">
     <example>Sarah quelle est la météo pour demain ?</example>
     <tag>out.action=new Object(); </tag>
+    <item weight="1.2">Sarah</item>
     <one-of>
-      <item>Sarah quelle est la météo pour demain</item>
-      <item>Sarah il fait quel temps demain</item>
+      <item>quelle est la météo pour demain</item>
+      <item>il fait quel temps demain</item>
     </one-of>
     <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/phantom/meteo";</tag>
     <tag>out.action.zip="78000";</tag>
