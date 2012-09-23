@@ -10,6 +10,7 @@ using System.Threading;
 using System.Text;
 using System.Web;
 using System.Globalization;
+using System.Collections.Generic;
 using Microsoft.Kinect;
 
 namespace encausse.net
@@ -38,7 +39,7 @@ namespace encausse.net
                 directory = args[0];
             }
 
-            String server = "192.168.0.8";
+            String server = "127.0.0.1";
             if (args.Length >= 2) {
                 server = args[1];
             }
@@ -50,7 +51,7 @@ namespace encausse.net
             }
 
             try {
-                WSRKinectMacro wsr = new WSRKinectMacro(directory, server, confidence);
+              WSRKinectMacro wsr = new WSRKinectMacro(directory, server, confidence);
             } 
             catch (Exception ex){
                 Console.WriteLine(ex);
@@ -70,10 +71,10 @@ namespace encausse.net
         private SpeechRecognitionEngine recognizer = null;
         DictationGrammar dication = null;
 
-        private String server = "192.168.0.8";
-        private String directory  = null;
+        private String server = "127.0.0.1";
+        private String[] directories  = null;
         private String abspath    = null; // Resolved absolute path
-        private FileSystemWatcher watcher = null;
+        private Dictionary<string, FileSystemWatcher> watchers = new Dictionary<string, FileSystemWatcher>();
         
         private int loading = 0;       // Files to load
         private Boolean load = false;  // Flags to trigger load;
@@ -85,8 +86,6 @@ namespace encausse.net
         //  WSRMacro CONSTRUCTOR
         // -----------------------------------------
 
-        public WSRKinectMacro() { }
-
         public WSRKinectMacro(String directory, String server, double confidence) {
             
             this.server = server;
@@ -95,7 +94,8 @@ namespace encausse.net
             Console.WriteLine("Server IP: " + server);
             Console.WriteLine("Confidence: " + confidence);
 
-            SetGrammar(directory);
+            this.directories = directory.Split(' ');
+            SetGrammar();
         }
 
         // -----------------------------------------
@@ -119,6 +119,7 @@ namespace encausse.net
 
             // Get recognizer
             SpeechRecognitionEngine sre = GetEngine();
+            // FIXME: unload grammar with same name ?
 
             // Load the grammar object to the recognizer.
             Console.WriteLine("[Grammar] Load file: " + name + " : " + file);
@@ -133,14 +134,11 @@ namespace encausse.net
             SpeechRecognitionEngine sre = GetEngine();
             sre.UnloadAllGrammars();
 
-            // Load Grammar
-            DirectoryInfo dir = new DirectoryInfo(directory);
-            abspath = dir.FullName;
-
-            Console.WriteLine("[Grammar] Load directory: " + abspath);
-            foreach (FileInfo f in dir.GetFiles("*.xml")) {
-                this.loading++;
-                LoadGrammar(f.FullName, f.Name);
+            // Iterate throught directories
+            foreach(string directory in this.directories){
+                DirectoryInfo dir = new DirectoryInfo(directory);
+                Console.WriteLine("[Grammar] Load directory: " + dir.FullName);
+                LoadGrammarDirectory(dir);
             }
 
             // Add a Dictation Grammar
@@ -150,6 +148,34 @@ namespace encausse.net
             GetEngine().LoadGrammarAsync(dication);
         }
 
+        private void LoadGrammarDirectory(DirectoryInfo dir) {
+            // Load Grammar
+            foreach (FileInfo f in dir.GetFiles("*.xml")) {
+                this.loading++;
+                LoadGrammar(f.FullName, f.Name);
+            }
+
+            // Recursive directory
+            foreach (DirectoryInfo d in dir.GetDirectories()) {
+                LoadGrammarDirectory(d);
+            }
+        }
+
+        public void SetGrammar() {
+            
+            // Stop Directory Watcher
+            StopDirectoryWatcher();
+            
+            for (int i = 0; i < this.directories.Length; i++ ) {
+              SetGrammar(this.directories[i]);
+            }
+
+            this.load = true;
+
+            // Start Automate
+            StartRecognizer();
+        }
+
         public void SetGrammar(String directory) {
 
             if (!Directory.Exists(directory)) {
@@ -157,51 +183,46 @@ namespace encausse.net
             }
 
             Console.WriteLine("Using directory: " + directory);
-
-            // Stop Directory Watcher
-            StopDirectoryWatcher();
-
-            this.directory = directory;
-            this.load = true;
-
+            
             // Set path to watcher
-            GetDirectoryWatcher().Path = directory;
-
-            // Start Automate
-            StartRecognizer();
+            AddDirectoryWatcher(directory);
         }
 
         // ------------------------------------------
         //  WSRMacro WATCHER
         // ------------------------------------------
 
-        public FileSystemWatcher GetDirectoryWatcher() {
-            if (watcher != null) {
-                return watcher;
+        public void AddDirectoryWatcher(String directory) {
+
+            if (watchers.ContainsKey(directory)) {
+                return;
             }
 
             Console.WriteLine("[Watcher] Init watcher");
-            watcher = new FileSystemWatcher();
+
+            // Build the watcher
+            FileSystemWatcher watcher = new FileSystemWatcher();
             watcher.Path = directory;
             watcher.Filter = "*.xml";
-            watcher.IncludeSubdirectories = false;
+            watcher.IncludeSubdirectories = true;
             watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size;
             watcher.Changed += new FileSystemEventHandler(watcher_Changed);
 
-            return watcher;
+            // Add watcher to a Map
+            watchers.Add(directory, watcher);
         }
 
         public void StartDirectoryWatcher() {
-            if (!GetDirectoryWatcher().EnableRaisingEvents) {
-                Console.WriteLine("[Watcher] Start watching");
-                GetDirectoryWatcher().EnableRaisingEvents = true;
+            Console.WriteLine("[Watcher] Start watching");
+            foreach( FileSystemWatcher watcher in watchers.Values ) {
+              watcher.EnableRaisingEvents = true;
             }
         }
 
         public void StopDirectoryWatcher() {
-            if (GetDirectoryWatcher().EnableRaisingEvents) {
-                Console.WriteLine("[Watcher] Stop watching");
-                GetDirectoryWatcher().EnableRaisingEvents = false;
+            Console.WriteLine("[Watcher] Start watching");
+            foreach (FileSystemWatcher watcher in watchers.Values) {
+                watcher.EnableRaisingEvents = false;
             }
         }
 
@@ -505,7 +526,7 @@ namespace encausse.net
 
         // Handle Grammar change event
         protected void watcher_Changed(object sender, FileSystemEventArgs e) {
-            SetGrammar(this.directory);
+            SetGrammar();
         }
     }
 }

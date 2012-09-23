@@ -10,9 +10,9 @@ using System.Threading;
 using System.Text;
 using System.Web;
 using System.Globalization;
+using System.Collections.Generic;
 
-namespace encausse.net
-{
+namespace encausse.net {
     /**
      * AUTOMATE
      * ********
@@ -30,28 +30,28 @@ namespace encausse.net
         //  MAIN
         // -----------------------------------------
         /*
-        static void Main(string[] args){
+        static void Main(string[] args) {
 
             String directory = "macros";
-            if (args.Length >= 1){
+            if (args.Length >= 1) {
                 directory = args[0];
             }
 
-            String server = "192.168.0.8";
+            String server = "127.0.0.1";
             if (args.Length >= 2) {
                 server = args[1];
             }
-            
+
             double confidence = 0.80;
             if (args.Length >= 3) {
-              CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
-              confidence = double.Parse(args[2], culture);
+                CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
+                confidence = double.Parse(args[2], culture);
             }
-         
+
             try {
                 WSRMacro wsr = new WSRMacro(directory, server, confidence);
-            } 
-            catch (Exception ex){
+            }
+            catch (Exception ex) {
                 Console.WriteLine(ex);
             }
 
@@ -63,17 +63,17 @@ namespace encausse.net
         //  WSRMacro VARIABLES
         // -----------------------------------------
 
-        private double CONFIDENCE = 0.82;
-        private double CONFIDENCE_DICTATION = 0.4;
+        private double CONFIDENCE = 0.80;
+        private double CONFIDENCE_DICTATION = 0.30;
 
         private SpeechRecognitionEngine recognizer = null;
         DictationGrammar dication = null;
 
-        private String server = "192.168.0.8";
-        private String directory = null;
-        private String abspath   = null; // Resolved absolute path
-        private FileSystemWatcher watcher = null;
-        
+        private String server = "127.0.0.1";
+        private String[] directories = null;
+        private String abspath = null; // Resolved absolute path
+        private Dictionary<string, FileSystemWatcher> watchers = new Dictionary<string, FileSystemWatcher>();
+
         private int loading = 0;       // Files to load
         private Boolean load = false;  // Flags to trigger load;
         private Boolean start = false; // Recognizer status
@@ -84,17 +84,16 @@ namespace encausse.net
         //  WSRMacro CONSTRUCTOR
         // -----------------------------------------
 
-        public WSRMacro() { }
-
         public WSRMacro(String directory, String server, double confidence) {
-            
+
             this.server = server;
             this.CONFIDENCE = confidence;
 
             Console.WriteLine("Server IP: " + server);
             Console.WriteLine("Confidence: " + confidence);
 
-            SetGrammar(directory);
+            this.directories = directory.Split(' ');
+            SetGrammar();
         }
 
         // -----------------------------------------
@@ -110,7 +109,7 @@ namespace encausse.net
             return grammar;
         }
 
-        public void LoadGrammar(String file, String name){
+        public void LoadGrammar(String file, String name) {
 
             // Get the Grammar
             Grammar grammar = GetGrammar(file);
@@ -118,6 +117,7 @@ namespace encausse.net
 
             // Get recognizer
             SpeechRecognitionEngine sre = GetEngine();
+            // FIXME: unload grammar with same name ?
 
             // Load the grammar object to the recognizer.
             Console.WriteLine("[Grammar] Load file: " + name + " : " + file);
@@ -132,14 +132,11 @@ namespace encausse.net
             SpeechRecognitionEngine sre = GetEngine();
             sre.UnloadAllGrammars();
 
-            // Load Grammar
-            DirectoryInfo dir = new DirectoryInfo(directory);
-            abspath = dir.FullName;
-
-            Console.WriteLine("[Grammar] Load directory: " + abspath);
-            foreach (FileInfo f in dir.GetFiles("*.xml")) {
-                this.loading++;
-                LoadGrammar(f.FullName, f.Name);
+            // Iterate throught directories
+            foreach (string directory in this.directories) {
+                DirectoryInfo dir = new DirectoryInfo(directory);
+                Console.WriteLine("[Grammar] Load directory: " + dir.FullName);
+                LoadGrammarDirectory(dir);
             }
 
             // Add a Dictation Grammar
@@ -149,56 +146,81 @@ namespace encausse.net
             GetEngine().LoadGrammarAsync(dication);
         }
 
+        private void LoadGrammarDirectory(DirectoryInfo dir) {
+            // Load Grammar
+            foreach (FileInfo f in dir.GetFiles("*.xml")) {
+                this.loading++;
+                LoadGrammar(f.FullName, f.Name);
+            }
+
+            // Recursive directory
+            foreach (DirectoryInfo d in dir.GetDirectories()) {
+                LoadGrammarDirectory(d);
+            }
+        }
+
+        public void SetGrammar() {
+
+            // Stop Directory Watcher
+            StopDirectoryWatcher();
+
+            for (int i = 0; i < this.directories.Length; i++) {
+                SetGrammar(this.directories[i]);
+            }
+
+            this.load = true;
+
+            // Start Automate
+            StartRecognizer();
+        }
+
         public void SetGrammar(String directory) {
 
             if (!Directory.Exists(directory)) {
                 throw new Exception("Macro's directory do not exists: " + directory);
             }
 
-            // Stop Directory Watcher
-            StopDirectoryWatcher();
-
-            this.directory = directory;
-            this.load = true;
+            Console.WriteLine("Using directory: " + directory);
 
             // Set path to watcher
-            GetDirectoryWatcher().Path = directory;
-
-            // Start Automate
-            StartRecognizer();
+            AddDirectoryWatcher(directory);
         }
 
         // ------------------------------------------
         //  WSRMacro WATCHER
         // ------------------------------------------
 
-        public FileSystemWatcher GetDirectoryWatcher() {
-            if (watcher != null) {
-                return watcher;
+        public void AddDirectoryWatcher(String directory) {
+
+            if (watchers.ContainsKey(directory)) {
+                return;
             }
 
             Console.WriteLine("[Watcher] Init watcher");
-            watcher = new FileSystemWatcher();
+
+            // Build the watcher
+            FileSystemWatcher watcher = new FileSystemWatcher();
             watcher.Path = directory;
             watcher.Filter = "*.xml";
-            watcher.IncludeSubdirectories = false;
+            watcher.IncludeSubdirectories = true;
             watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size;
             watcher.Changed += new FileSystemEventHandler(watcher_Changed);
 
-            return watcher;
+            // Add watcher to a Map
+            watchers.Add(directory, watcher);
         }
 
         public void StartDirectoryWatcher() {
-            if (!GetDirectoryWatcher().EnableRaisingEvents) {
-                Console.WriteLine("[Watcher] Start watching");
-                GetDirectoryWatcher().EnableRaisingEvents = true;
+            Console.WriteLine("[Watcher] Start watching");
+            foreach (FileSystemWatcher watcher in watchers.Values) {
+                watcher.EnableRaisingEvents = true;
             }
         }
 
         public void StopDirectoryWatcher() {
-            if (GetDirectoryWatcher().EnableRaisingEvents) {
-                Console.WriteLine("[Watcher] Stop watching");
-                GetDirectoryWatcher().EnableRaisingEvents = false;
+            Console.WriteLine("[Watcher] Start watching");
+            foreach (FileSystemWatcher watcher in watchers.Values) {
+                watcher.EnableRaisingEvents = false;
             }
         }
 
@@ -210,9 +232,6 @@ namespace encausse.net
             if (recognizer != null) {
                 return recognizer;
             }
-            
-            // For Kinect use this:
-            // http://social.msdn.microsoft.com/Forums/en-US/kinectsdkaudioapi/thread/f184a652-a63f-4c72-a807-f9770fdf57f8
 
             Console.WriteLine("[Engine] Init recognizer");
             recognizer = new SpeechRecognitionEngine(new System.Globalization.CultureInfo("fr-FR"));
@@ -244,20 +263,20 @@ namespace encausse.net
             //recognizer.MaxAlternates = 0;
             Console.WriteLine("MaxAlternates: {0}", recognizer.MaxAlternates);
 
-            // Set the input to the recognizer.
-            recognizer.SetInputToDefaultAudioDevice();
+           // Set the input to the recognizer.
+           recognizer.SetInputToDefaultAudioDevice();
 
-            return recognizer;
+           return recognizer;
         }
 
         // See also: http://msdn.microsoft.com/en-us/library/ms554584.aspx
         public void StartRecognizer() {
 
             // Request a loading of grammar
-            if (this.load){
-              this.load = false;
-              LoadGrammar();
-              return;
+            if (this.load) {
+                this.load = false;
+                LoadGrammar();
+                return;
             }
 
             // Prevent lasting call during grammar
@@ -268,9 +287,9 @@ namespace encausse.net
 
             // Start Recognizer
             if (!this.start) {
-              this.start = true;
-              GetEngine().RecognizeAsync(RecognizeMode.Single);
-              // Console.WriteLine("[Engine] Start listening " + GetEngine().AudioLevel);
+                this.start = true;
+                GetEngine().RecognizeAsync(RecognizeMode.Single);
+                // Console.WriteLine("[Engine] Start listening " + GetEngine().AudioLevel);
             }
         }
 
@@ -304,20 +323,20 @@ namespace encausse.net
                 if (it.Current.Name == "confidence") continue;
                 if (it.Current.Name == "uri") continue;
                 if (it.Current.HasChildren) {
-                  children = BuildResultURL(it.Current.SelectChildren(String.Empty, it.Current.NamespaceURI));
+                    children = BuildResultURL(it.Current.SelectChildren(String.Empty, it.Current.NamespaceURI));
                 }
                 qs += (children == "") ? (it.Current.Name + "=" + it.Current.Value + "&") : (children);
             }
             return qs;
         }
-        
+
         protected String GetResultURL(XPathNavigator xnav) {
             XPathNavigator xurl = xnav.SelectSingleNode("/SML/action/@uri");
             if (xurl == null) { return null; }
 
             // Build URI
             String url = xurl.Value + "?";
-            url = url.Replace("http://127.0.0.1:", "http://"+server+":");
+            url = url.Replace("http://127.0.0.1:", "http://" + server + ":");
 
             // Build QueryString
             url += BuildResultURL(xnav.Select("/SML/action/*"));
@@ -329,12 +348,12 @@ namespace encausse.net
         }
 
         protected double GetResultThreashold(XPathNavigator xnav) {
-          XPathNavigator level = xnav.SelectSingleNode("/SML/action/@threashold");
-          if (level != null) {
-            Console.WriteLine("Setting confidence level: " + level.Value);
-            return level.ValueAsDouble; 
-          }
-          return CONFIDENCE;
+            XPathNavigator level = xnav.SelectSingleNode("/SML/action/@threashold");
+            if (level != null) {
+                Console.WriteLine("Setting confidence level: " + level.Value);
+                return level.ValueAsDouble;
+            }
+            return CONFIDENCE;
         }
 
         protected void SendRequest(String url) {
@@ -342,20 +361,20 @@ namespace encausse.net
 
             Console.WriteLine("[HTTP] Build HttpRequest: " + url);
 
-            HttpWebRequest req = (HttpWebRequest) WebRequest.Create(url);
+            HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
             req.Method = "GET";
 
             Console.WriteLine("[HTTP] Send HttpRequest: " + req.Address);
-            
+
             try {
                 HttpWebResponse res = (HttpWebResponse)req.GetResponse();
                 Console.WriteLine("[HTTP] Response status: {0}", res.StatusCode);
 
-                using (StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8)){
-                  Say(sr.ReadToEnd());
+                using (StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8)) {
+                    Say(sr.ReadToEnd());
                 }
             }
-            catch (WebException ex){
+            catch (WebException ex) {
                 Console.WriteLine("[HTTP] Exception: " + ex.Message);
             }
         }
@@ -385,7 +404,7 @@ namespace encausse.net
         // -----------------------------------------
 
         // Handle the LoadGrammarCompleted event.
-        protected void recognizer_LoadGrammarCompleted(object sender, LoadGrammarCompletedEventArgs e){
+        protected void recognizer_LoadGrammarCompleted(object sender, LoadGrammarCompletedEventArgs e) {
             Console.WriteLine("[Grammar]  Loaded: " + e.Grammar.Name);
             this.loading--;
             StartRecognizer();
@@ -438,7 +457,7 @@ namespace encausse.net
 
             // Parse Result's Dication
             if (hasDictation(xnav)) {
-                this.dictationUrl = url; 
+                this.dictationUrl = url;
                 return;
             }
 
@@ -451,7 +470,7 @@ namespace encausse.net
 
             string resultText = e.Result != null ? e.Result.Text : "<null>";
             Console.WriteLine("[Engine] RecognizeCompleted ({0}): {1}", DateTime.Now.ToString("mm:ss.f"), resultText);
-         // Console.WriteLine("[Engine]  BabbleTimeout: {0}; InitialSilenceTimeout: {1}; Result text: {2}", e.BabbleTimeout, e.InitialSilenceTimeout, resultText);
+            // Console.WriteLine("[Engine]  BabbleTimeout: {0}; InitialSilenceTimeout: {1}; Result text: {2}", e.BabbleTimeout, e.InitialSilenceTimeout, resultText);
             this.start = false;
             StartRecognizer();
         }
@@ -463,7 +482,7 @@ namespace encausse.net
 
         // Handle Grammar change event
         protected void watcher_Changed(object sender, FileSystemEventArgs e) {
-            SetGrammar(this.directory);
+            SetGrammar();
         }
     }
 }

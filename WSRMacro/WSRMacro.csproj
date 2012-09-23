@@ -41,6 +41,7 @@
     <Content Include="macros\calendar.xml">
       <SubType>Designer</SubType>
     </Content>
+    <Content Include="plugins\meteo\meteo.xml" />
     <None Include="macros\fr-FR.grxml" />
     <Content Include="macros\eedomus.xml">
       <SubType>Designer</SubType>
@@ -48,7 +49,9 @@
     <Content Include="macros\karotz.xml">
       <SubType>Designer</SubType>
     </Content>
-    <Content Include="macros\meteo.xml" />
+    <Content Include="macros\meteo.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="macros\movie.xml">
       <SubType>Designer</SubType>
     </Content>
@@ -66,6 +69,7 @@
     <Reference Include="System.Speech" />
     <Reference Include="System.XML" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
