@@ -1,532 +1,64 @@
 ﻿using System;
-using System.Speech;
-using System.Speech.Recognition;
-using System.Speech.Synthesis;
-using System.Speech.AudioFormat;
-using System.IO;
-using System.Xml.XPath;
-using System.Net;
-using System.Threading;
 using System.Text;
-using System.Web;
-using System.Globalization;
+using System.IO;
+using System.Speech.Recognition;
+using System.Speech.AudioFormat;
 using System.Collections.Generic;
 using Microsoft.Kinect;
 
-namespace encausse.net
-{
-    /**
-     * AUTOMATE
-     * ********
-     *                         * * * * * * * * * * * * *
-     *                         *                       *
-     * Main => SetGrammar => Start => Recognized => Complete
-     *             *           *           *
-     *             *           *           *
-     *          Watcher   LoadGrammar    HTTP
-     */
+namespace encausse.net {
 
-    class WSRKinectMacro {
+  class WSRKinectMacro : WSRMacro{
 
-        // -----------------------------------------
-        //  MAIN
-        // -----------------------------------------
-        
-        static void Main(string[] args){
+    // ==========================================
+    //  WSRMacro CONSTRUCTOR
+    // ==========================================
 
-            String directory = "macros";
-            if (args.Length >= 1){
-                directory = args[0];
-            }
-
-            String server = "127.0.0.1";
-            if (args.Length >= 2) {
-                server = args[1];
-            }
-
-            double confidence = 0.80;
-            if (args.Length >= 3) {
-              CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
-              confidence = double.Parse(args[2], culture);
-            }
-
-            try {
-              WSRKinectMacro wsr = new WSRKinectMacro(directory, server, confidence);
-            } 
-            catch (Exception ex){
-                Console.WriteLine(ex);
-            }
-
-            // Keep the console window open.
-            Console.ReadLine();
-        }
-        
-        // -----------------------------------------
-        //  WSRMacro VARIABLES
-        // -----------------------------------------
-
-        private double CONFIDENCE = 0.80;
-        private double CONFIDENCE_DICTATION = 0.30;
-
-        private SpeechRecognitionEngine recognizer = null;
-        DictationGrammar dication = null;
-
-        private String server = "127.0.0.1";
-        private String[] directories  = null;
-        private String abspath    = null; // Resolved absolute path
-        private Dictionary<string, FileSystemWatcher> watchers = new Dictionary<string, FileSystemWatcher>();
-        
-        private int loading = 0;       // Files to load
-        private Boolean load = false;  // Flags to trigger load;
-        private Boolean start = false; // Recognizer status
-
-        private String dictationUrl = null; // Last dication URL
-
-        // -----------------------------------------
-        //  WSRMacro CONSTRUCTOR
-        // -----------------------------------------
-
-        public WSRKinectMacro(String directory, String server, double confidence) {
-            
-            this.server = server;
-            this.CONFIDENCE = confidence;
-
-            Console.WriteLine("Server IP: " + server);
-            Console.WriteLine("Confidence: " + confidence);
-
-            this.directories = directory.Split(' ');
-            SetGrammar();
-        }
-
-        // -----------------------------------------
-        //  WSRMacro METHODS
-        // -----------------------------------------
-
-        public Grammar GetGrammar(String file) {
-
-            // Grammar grammar = new Grammar(new FileStream(file, FileMode.Open), null, baseURI);
-            Grammar grammar = new Grammar(file);
-            grammar.Enabled = true;
-
-            return grammar;
-        }
-
-        public void LoadGrammar(String file, String name){
-
-            // Get the Grammar
-            Grammar grammar = GetGrammar(file);
-            grammar.Name = name;
-
-            // Get recognizer
-            SpeechRecognitionEngine sre = GetEngine();
-            // FIXME: unload grammar with same name ?
-
-            // Load the grammar object to the recognizer.
-            Console.WriteLine("[Grammar] Load file: " + name + " : " + file);
-            sre.LoadGrammarAsync(grammar);
-        }
-
-        protected void LoadGrammar() {
-            this.loading = 0;
-
-            // Unload All Grammar
-            Console.WriteLine("[Grammar] Unload");
-            SpeechRecognitionEngine sre = GetEngine();
-            sre.UnloadAllGrammars();
-
-            // Iterate throught directories
-            foreach(string directory in this.directories){
-                DirectoryInfo dir = new DirectoryInfo(directory);
-                Console.WriteLine("[Grammar] Load directory: " + dir.FullName);
-                LoadGrammarDirectory(dir);
-            }
-
-            // Add a Dictation Grammar
-            dication = new DictationGrammar("grammar:dictation");
-            dication.Name = "dictation";
-            dication.Enabled = false;
-            GetEngine().LoadGrammarAsync(dication);
-        }
-
-        private void LoadGrammarDirectory(DirectoryInfo dir) {
-            // Load Grammar
-            foreach (FileInfo f in dir.GetFiles("*.xml")) {
-                this.loading++;
-                LoadGrammar(f.FullName, f.Name);
-            }
-
-            // Recursive directory
-            foreach (DirectoryInfo d in dir.GetDirectories()) {
-                LoadGrammarDirectory(d);
-            }
-        }
-
-        public void SetGrammar() {
-            
-            // Stop Directory Watcher
-            StopDirectoryWatcher();
-            
-            for (int i = 0; i < this.directories.Length; i++ ) {
-              SetGrammar(this.directories[i]);
-            }
-
-            this.load = true;
-
-            // Start Automate
-            StartRecognizer();
-        }
-
-        public void SetGrammar(String directory) {
-
-            if (!Directory.Exists(directory)) {
-                throw new Exception("Macro's directory do not exists: " + directory);
-            }
-
-            Console.WriteLine("Using directory: " + directory);
-            
-            // Set path to watcher
-            AddDirectoryWatcher(directory);
-        }
-
-        // ------------------------------------------
-        //  WSRMacro WATCHER
-        // ------------------------------------------
-
-        public void AddDirectoryWatcher(String directory) {
-
-            if (watchers.ContainsKey(directory)) {
-                return;
-            }
-
-            Console.WriteLine("[Watcher] Init watcher");
-
-            // Build the watcher
-            FileSystemWatcher watcher = new FileSystemWatcher();
-            watcher.Path = directory;
-            watcher.Filter = "*.xml";
-            watcher.IncludeSubdirectories = true;
-            watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size;
-            watcher.Changed += new FileSystemEventHandler(watcher_Changed);
-
-            // Add watcher to a Map
-            watchers.Add(directory, watcher);
-        }
-
-        public void StartDirectoryWatcher() {
-            Console.WriteLine("[Watcher] Start watching");
-            foreach( FileSystemWatcher watcher in watchers.Values ) {
-              watcher.EnableRaisingEvents = true;
-            }
-        }
-
-        public void StopDirectoryWatcher() {
-            Console.WriteLine("[Watcher] Start watching");
-            foreach (FileSystemWatcher watcher in watchers.Values) {
-                watcher.EnableRaisingEvents = false;
-            }
-        }
-
-        // ------------------------------------------
-        //  WSRMacro ENGINE
-        // ------------------------------------------
-
-        public SpeechRecognitionEngine GetEngine() {
-            if (recognizer != null) {
-                return recognizer;
-            }
-
-            Console.WriteLine("[Engine] Init recognizer");
-            recognizer = new SpeechRecognitionEngine(new System.Globalization.CultureInfo("fr-FR"));
-
-            // Add a handler for the LoadGrammarCompleted event.
-            recognizer.LoadGrammarCompleted += new EventHandler<LoadGrammarCompletedEventArgs>(recognizer_LoadGrammarCompleted);
-
-            // Add a handler for the SpeechRecognized event.
-            recognizer.SpeechRecognized += new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
-
-            // Add a handler for the SpeechRecognizedCompleted event.
-            recognizer.RecognizeCompleted += new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
-
-            // Add a handler for the AudioStateChangedEvent event.
-            recognizer.AudioStateChanged += new EventHandler<AudioStateChangedEventArgs>(recognizer_AudioStateChanged);
-
-            // Set recognizer properties
-            recognizer.InitialSilenceTimeout = TimeSpan.FromSeconds(3);
-            recognizer.BabbleTimeout = TimeSpan.FromSeconds(2);
-            recognizer.EndSilenceTimeout = TimeSpan.FromSeconds(1);
-            recognizer.EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(1.5);
-
-            Console.WriteLine("BabbleTimeout: {0}", recognizer.BabbleTimeout);
-            Console.WriteLine("InitialSilenceTimeout: {0}", recognizer.InitialSilenceTimeout);
-            Console.WriteLine("EndSilenceTimeout: {0}", recognizer.EndSilenceTimeout);
-            Console.WriteLine("EndSilenceTimeoutAmbiguous: {0}", recognizer.EndSilenceTimeoutAmbiguous);
-
-            // Set Max Alternate to 0
-            //recognizer.MaxAlternates = 0;
-            Console.WriteLine("MaxAlternates: {0}", recognizer.MaxAlternates);
-
-            if (!SetupKinect(recognizer)) {
-              // Set the input to the recognizer.
-              recognizer.SetInputToDefaultAudioDevice();
-            }
-
-            return recognizer;
-        }
-
-        // See SDK Speech Sample for more infos
-        private KinectSensor sensor = null;
-        public Boolean SetupKinect(SpeechRecognitionEngine sre){
-
-          // Looking for a valid sensor
-          foreach (var potentialSensor in KinectSensor.KinectSensors) {
-            if (potentialSensor.Status == KinectStatus.Connected) {
-              sensor = potentialSensor;
-              break;
-            }
-          }
-
-          // Abort if there is no sensor available
-          if (null == sensor) {
-            Console.WriteLine("No Kinect Sensor");
-            return false;
-          }
-
-          // Starting the sensor                   
-          try { sensor.Start(); }
-          catch (IOException) { sensor = null; return false;  } // Some other application is streaming from the same Kinect sensor
-          
-          // Use Audio Source to Engine
-          KinectAudioSource source = sensor.AudioSource;
-
-          /*
-          Console.WriteLine("AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
-          Console.WriteLine("BeamAngle : " + source.BeamAngle);
-          Console.WriteLine("EchoCancellationMode : " + source.EchoCancellationMode);
-          Console.WriteLine("EchoCancellationSpeakerIndex : " + source.EchoCancellationSpeakerIndex);
-          Console.WriteLine("NoiseSuppression : " + source.NoiseSuppression);
-          Console.WriteLine("SoundSourceAngle : " + source.SoundSourceAngle);
-          Console.WriteLine("SoundSourceAngleConfidence : " + source.SoundSourceAngleConfidence);
-          */
-
-          sre.SetInputToAudioStream(source.Start(), new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
-          Console.WriteLine("Using Kinect Sensors !");
-          return true;
-        }
-
-        // See also: http://msdn.microsoft.com/en-us/library/ms554584.aspx
-        public void StartRecognizer() {
-
-            // Request a loading of grammar
-            if (this.load){
-              this.load = false;
-              LoadGrammar();
-              return;
-            }
-
-            // Prevent lasting call during grammar
-            if (this.loading > 0) { return; }
-
-            // Start Directory Watcher
-            StartDirectoryWatcher();
-
-            // Start Recognizer
-            if (!this.start) {
-              this.start = true;
-              GetEngine().RecognizeAsync(RecognizeMode.Single);
-              // Console.WriteLine("[Engine] Start listening " + GetEngine().AudioLevel);
-            }
-        }
-
-        public void StopRecognizer() {
-            Console.WriteLine("[Engine] Stop listening");
-            GetEngine().RecognizeAsyncStop();
-        }
-
-        // ------------------------------------------
-        //  WSRMacro HTTP
-        // ------------------------------------------
-
-        protected Boolean hasDictation(XPathNavigator xnav) {
-            XPathNavigator dictation = xnav.SelectSingleNode("/SML/action/@dictation");
-            if (dictation == null) { return false; }
-
-            dication.Enabled = true;
-            return true;
-        }
-
-        protected String GetResultTTS(XPathNavigator xnav) {
-            XPathNavigator tts = xnav.SelectSingleNode("/SML/action/@tts");
-            if (tts != null) { return tts.Value; }
-            return null;
-        }
-
-        protected String BuildResultURL(XPathNodeIterator it) {
-            String qs = "";
-            while (it.MoveNext()) {
-                String children = "";
-                if (it.Current.Name == "confidence") continue;
-                if (it.Current.Name == "uri") continue;
-                if (it.Current.HasChildren) {
-                  children = BuildResultURL(it.Current.SelectChildren(String.Empty, it.Current.NamespaceURI));
-                }
-                qs += (children == "") ? (it.Current.Name + "=" + it.Current.Value + "&") : (children);
-            }
-            return qs;
-        }
-        
-        protected String GetResultURL(XPathNavigator xnav) {
-            XPathNavigator xurl = xnav.SelectSingleNode("/SML/action/@uri");
-            if (xurl == null) { return null; }
-
-            // Build URI
-            String url = xurl.Value + "?";
-            url = url.Replace("http://127.0.0.1:", "http://" + server + ":");
-
-            // Build QueryString
-            url += BuildResultURL(xnav.Select("/SML/action/*"));
-
-            // Append Directory Path
-            url += "directory=" + abspath;
-
-            return url;
-        }
-
-        protected double GetResultThreashold(XPathNavigator xnav) {
-          XPathNavigator level = xnav.SelectSingleNode("/SML/action/@threashold");
-          if (level != null) {
-            Console.WriteLine("Setting confidence level: " + level.Value);
-            return level.ValueAsDouble; 
-          }
-          return CONFIDENCE;
-        }
-
-        protected void SendRequest(String url) {
-            if (url == null) { return; }
-
-            Console.WriteLine("[HTTP] Build HttpRequest: " + url);
-
-            HttpWebRequest req = (HttpWebRequest) WebRequest.Create(url);
-            req.Method = "GET";
-
-            Console.WriteLine("[HTTP] Send HttpRequest: " + req.Address);
-            
-            try {
-                HttpWebResponse res = (HttpWebResponse)req.GetResponse();
-                Console.WriteLine("[HTTP] Response status: {0}", res.StatusCode);
-
-                using (StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8)){
-                  Say(sr.ReadToEnd());
-                }
-            }
-            catch (WebException ex){
-                Console.WriteLine("[HTTP] Exception: " + ex.Message);
-            }
-        }
-
-        // -----------------------------------------
-        //  WSRMacro SPEECH
-        // -----------------------------------------
-
-        public void Say(String tts) {
-            if (tts == null) { return; }
-
-            Console.WriteLine("[TTS] Say: {0}", tts);
-            using (SpeechSynthesizer synthesizer = new SpeechSynthesizer()) {
-
-                // Configure the audio output.
-                synthesizer.SetOutputToDefaultAudioDevice();
-
-                // Build and speak a prompt.
-                PromptBuilder builder = new PromptBuilder();
-                builder.AppendText(tts);
-                synthesizer.Speak(builder);
-            }
-        }
-
-        // -----------------------------------------
-        //  WSRMacro LISTENERS
-        // -----------------------------------------
-
-        // Handle the LoadGrammarCompleted event.
-        protected void recognizer_LoadGrammarCompleted(object sender, LoadGrammarCompletedEventArgs e){
-            Console.WriteLine("[Grammar]  Loaded: " + e.Grammar.Name);
-            this.loading--;
-            StartRecognizer();
-        }
-
-        // Handle the SpeechRecognized event.
-        protected void recognizer_SpeechRecognized(object sender, SpeechRecognizedEventArgs e) {
-            RecognitionResult rr = e.Result;
-
-            // 1. Handle dictation mode
-            if (this.dication.Enabled) {
-                if (rr.Confidence < CONFIDENCE_DICTATION) {
-                    Console.WriteLine("[Engine] Dictation rejected: " + rr.Confidence + " Text: " + rr.Text);
-                    return;
-                }
-
-                Console.WriteLine("[Engine] Dictation recognized: " + rr.Confidence + " Text: " + rr.Text);
-
-                // Stop dictation
-                this.dication.Enabled = false;
-
-                // Send previous request with dication
-                String dication = System.Uri.EscapeDataString(rr.Text);
-                SendRequest(this.dictationUrl + "&dictation=" + dication);
-
-                this.dictationUrl = null;
-                return;
-            }
-
-            // 2. Handle speech mode
-
-            // Build XPath navigator
-            XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
-            double confidence = GetResultThreashold(xnav);
-
-            if (rr.Confidence < confidence) {
-                Console.WriteLine("[Engine] Speech rejected: " + rr.Confidence + " Text: " + rr.Text);
-                return;
-            }
-
-            Console.WriteLine("[Engine] Speech recognized: " + rr.Confidence + " Text: " + rr.Text);
-            Console.WriteLine(xnav.OuterXml);
-
-            // Parse Result's TTS
-            String tts = GetResultTTS(xnav);
-            Say(tts);
-
-            // Parse Result's URL and send Request
-            String url = GetResultURL(xnav);
-
-            // Parse Result's Dication
-            if (hasDictation(xnav)) {
-                this.dictationUrl = url; 
-                return;
-            }
-
-            // Otherwise send the request
-            SendRequest(url);
-        }
-
-        // Handle the SpeechRecognized event.
-        protected void recognizer_RecognizeCompleted(object sender, RecognizeCompletedEventArgs e) {
-
-            string resultText = e.Result != null ? e.Result.Text : "<null>";
-            Console.WriteLine("[Engine] RecognizeCompleted ({0}): {1}", DateTime.Now.ToString("mm:ss.f"), resultText);
-         // Console.WriteLine("[Engine]  BabbleTimeout: {0}; InitialSilenceTimeout: {1}; Result text: {2}", e.BabbleTimeout, e.InitialSilenceTimeout, resultText);
-            this.start = false;
-            StartRecognizer();
-        }
-
-        // Handle Audio state changed event
-        static void recognizer_AudioStateChanged(object sender, AudioStateChangedEventArgs e) {
-            // Console.WriteLine("[Engine] AudioStateChanged ({0}): {1}", DateTime.Now.ToString("mm:ss.f"), e.AudioState);
-        }
-
-        // Handle Grammar change event
-        protected void watcher_Changed(object sender, FileSystemEventArgs e) {
-            SetGrammar();
-        }
+    public WSRKinectMacro(List<String> dir, double confidence, String server, String port)
+      : base(dir, confidence, server, port) {
     }
+
+    // ==========================================
+    //  WSRMacro SENSOR
+    // ==========================================
+
+    // See SDK Speech Sample for more infos
+    protected KinectSensor sensor = null;
+    public override Boolean SetupDevice(SpeechRecognitionEngine sre) {
+
+      // Looking for a valid sensor 
+      foreach (var potentialSensor in KinectSensor.KinectSensors) {
+        if (potentialSensor.Status == KinectStatus.Connected) {
+          sensor = potentialSensor;
+          break;
+        }
+      }
+
+      // Abort if there is no sensor available
+      if (null == sensor) {
+        log("KINECT", "No Kinect Sensor");
+        return false;
+      }
+
+      // Starting the sensor                   
+      try { sensor.Start(); }
+      catch (IOException) { sensor = null; return false; } // Some other application is streaming from the same Kinect sensor
+
+      // Use Audio Source to Engine
+      KinectAudioSource source = sensor.AudioSource;
+
+      log(-1, "KINECT", "AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
+      log(-1, "KINECT", "BeamAngle : " + source.BeamAngle);
+      log(-1, "KINECT", "EchoCancellationMode : " + source.EchoCancellationMode);
+      log(-1, "KINECT", "EchoCancellationSpeakerIndex : " + source.EchoCancellationSpeakerIndex);
+      log(-1, "KINECT", "NoiseSuppression : " + source.NoiseSuppression);
+      log(-1, "KINECT", "SoundSourceAngle : " + source.SoundSourceAngle);
+      log(-1, "KINECT", "SoundSourceAngleConfidence : " + source.SoundSourceAngleConfidence);
+      
+
+      sre.SetInputToAudioStream(source.Start(), new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
+      log("KINECT", "Using Kinect Sensors !"); 
+      return true;
+    }
+  }
 }

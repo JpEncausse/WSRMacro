@@ -10,4 +10,5 @@
     <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/phantom/meteo";</tag>
     <tag>out.action.zip="78000";</tag>
   </rule>
-</grammar>
+</grammar> 
+ 
