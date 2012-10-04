@@ -47,13 +47,13 @@ namespace encausse.net {
       // Use Audio Source to Engine
       KinectAudioSource source = sensor.AudioSource;
 
-      log(-1, "KINECT", "AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
-      log(-1, "KINECT", "BeamAngle : " + source.BeamAngle);
-      log(-1, "KINECT", "EchoCancellationMode : " + source.EchoCancellationMode);
-      log(-1, "KINECT", "EchoCancellationSpeakerIndex : " + source.EchoCancellationSpeakerIndex);
-      log(-1, "KINECT", "NoiseSuppression : " + source.NoiseSuppression);
-      log(-1, "KINECT", "SoundSourceAngle : " + source.SoundSourceAngle);
-      log(-1, "KINECT", "SoundSourceAngleConfidence : " + source.SoundSourceAngleConfidence);
+      log(0, "KINECT", "AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
+      log(0, "KINECT", "BeamAngle : " + source.BeamAngle);
+      log(0, "KINECT", "EchoCancellationMode : " + source.EchoCancellationMode);
+      log(0, "KINECT", "EchoCancellationSpeakerIndex : " + source.EchoCancellationSpeakerIndex);
+      log(0, "KINECT", "NoiseSuppression : " + source.NoiseSuppression);
+      log(0, "KINECT", "SoundSourceAngle : " + source.SoundSourceAngle);
+      log(0, "KINECT", "SoundSourceAngleConfidence : " + source.SoundSourceAngleConfidence);
       
 
       sre.SetInputToAudioStream(source.Start(), new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));

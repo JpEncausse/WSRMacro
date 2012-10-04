@@ -37,12 +37,16 @@
     <StartupObject>encausse.net.WSRLaunch</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Streamer.cs" />
     <Compile Include="WSRKinectMacro.cs" />
     <Compile Include="WSRLaunch.cs" />
     <Compile Include="WSRMacro.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="macros\calendar.xml">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="macros\wildcard.xml">
       <SubType>Designer</SubType>
     </Content>
     <Content Include="plugins\meteo\meteo.xml" />

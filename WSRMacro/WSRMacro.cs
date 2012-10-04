@@ -76,7 +76,7 @@ namespace encausse.net {
     //  WSRMacro GRAMMAR
     // ==========================================
 
-    protected DictationGrammar dication = null;   // The dictation grammar
+    protected DictationGrammar dictation = null;   // The dictation grammar
     protected String DIR_PATH = null;             // FIXME: Resolved absolute path
     protected bool reload = true;
 
@@ -105,10 +105,10 @@ namespace encausse.net {
 
       // Add a Dictation Grammar
       log("GRAMMAR", "Load dictation grammar");
-      dication = new DictationGrammar("grammar:dictation");
-      dication.Name = "dictation";
-      dication.Enabled = false;
-      sre.LoadGrammar(dication);
+      dictation = new DictationGrammar("grammar:dictation");
+      dictation.Name = "dictation";
+      dictation.Enabled = false;
+      sre.LoadGrammar(dictation);
 
       // Start Watching
       StartDirectoryWatcher();
@@ -197,8 +197,29 @@ namespace encausse.net {
     //  WSRMacro ENGINE
     // ==========================================
 
-    protected SpeechRecognitionEngine recognizer = null;
+    /*
+    protected SpeechRecognitionEngine dictanizer = null;
+    public SpeechRecognitionEngine GetDictationEngine() {
+      if (dictanizer != null) {
+        return dictanizer;
+      }
 
+      log("ENGINE", "Init recognizer");
+      dictanizer = new SpeechRecognitionEngine(new System.Globalization.CultureInfo("fr-FR"));
+
+      // Set recognizer properties
+      SetupProperties(dictanizer);
+
+      // Load a Dictation grammar
+      DictationGrammar d = new DictationGrammar("grammar:dictation");
+      d.Name = "dictation";
+      dictanizer.LoadGrammar(d);
+
+      return dictanizer;
+    }
+    */
+
+    protected SpeechRecognitionEngine recognizer = null;
     public void StartRecognizer() {
       // Load grammar if needed
       LoadGrammar();
@@ -220,22 +241,22 @@ namespace encausse.net {
 
       log("ENGINE", "Init recognizer");
       recognizer = new SpeechRecognitionEngine(new System.Globalization.CultureInfo("fr-FR"));
-
-      // Add a handler for the SpeechRecognized event.
       recognizer.SpeechRecognized += new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
-
-      // Add a handler for the SpeechRecognizedCompleted event.
       recognizer.RecognizeCompleted += new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
-
-      // Add a handler for the AudioStateChangedEvent event.
       recognizer.AudioStateChanged += new EventHandler<AudioStateChangedEventArgs>(recognizer_AudioStateChanged);
 
-      // Set recognizer properties
-      // SetupProperties(recognizer);
+      // Alternate
+      recognizer.MaxAlternates = 2;
+      log("ENGINE", "MaxAlternates: " + recognizer.MaxAlternates);
 
       // Set the input to the recognizer.
       if (!SetupDevice(recognizer)) {
-        recognizer.SetInputToDefaultAudioDevice();
+        try {
+          recognizer.SetInputToDefaultAudioDevice();
+        }
+        catch (InvalidOperationException ex) {
+          log("ENGINE", "No default input device: " + ex.Message);
+        }
       }
 
       return recognizer;
@@ -257,10 +278,10 @@ namespace encausse.net {
     // ==========================================
 
     public void SetupProperties(SpeechRecognitionEngine sre) {
-      sre.InitialSilenceTimeout = TimeSpan.FromSeconds(3);
-      sre.BabbleTimeout = TimeSpan.FromSeconds(2);
-      sre.EndSilenceTimeout = TimeSpan.FromSeconds(1);
-      sre.EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(1.5);
+      //sre.InitialSilenceTimeout = TimeSpan.FromSeconds(3);
+      //sre.BabbleTimeout = TimeSpan.FromSeconds(2);
+      //sre.EndSilenceTimeout = TimeSpan.FromSeconds(1);
+      //sre.EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(1.5);
 
       log(-2, "ENGINE", "BabbleTimeout: " + sre.BabbleTimeout);
       log(-2, "ENGINE", "InitialSilenceTimeout: " + sre.InitialSilenceTimeout);
@@ -284,18 +305,18 @@ namespace encausse.net {
     
     protected String dictationUrl = null; // Last dication URL
 
-    // Handle the SpeechRecognized event.
     protected void recognizer_SpeechRecognized(object sender, SpeechRecognizedEventArgs e) {
       RecognitionResult rr = e.Result;
 
       // 0. Prevent while speaking
       if (speaking) {
-        log("ENGINE", "Speech rejected while speaking: " + rr.Confidence + " Text: " + rr.Text);
+        log("ENGINE", "REJECTED Speech while speaking: " + rr.Confidence + " Text: " + rr.Text);
         return;
       }
 
       // 1. Handle dictation mode
-      if (HandleDictation(rr)) {
+      if (this.dictation.Enabled && HandleDictation(rr, CONFIDENCE_DICTATION)) {
+        this.dictation.Enabled = false;
         return;
       }
 
@@ -313,32 +334,25 @@ namespace encausse.net {
       String url = GetURL(xnav);
 
       // 5. Parse Result's Dication
-      if (hasDictation(xnav)) {
-        this.dictationUrl = url;
+      if (HandleWildcard(rr, url)) {
         return;
       }
 
       // 6. Otherwise send the request
-      SendRequest(url);
+      SendRequest(url); 
     }
 
-    protected bool HandleDictation(RecognitionResult rr) {
-      if (!this.dication.Enabled) {
-        return false;
-      }
+    protected bool HandleDictation(RecognitionResult rr, double confidence) {
 
-      if (rr.Confidence < CONFIDENCE_DICTATION) {
-        log("ENGINE", "Dictation rejected: " + rr.Confidence + " Text: " + rr.Text);
+      if (rr.Confidence < confidence) {
+        log("ENGINE", "REJECTED Dictation: " + rr.Confidence + " Text: " + rr.Text);
         return true;
       }
-      log("ENGINE", "Dictation recognized: " + rr.Confidence + " Text: " + rr.Text);
+      log("ENGINE", "RECOGNIZED Dictation: " + rr.Confidence + " Text: " + rr.Text);
 
-      // Stop dictation
-      this.dication.Enabled = false;
-
-      // Send previous request with dication
-      String dication = System.Uri.EscapeDataString(rr.Text);
-      SendRequest(this.dictationUrl + "&dictation=" + dication);
+      // Send previous request with dictation
+      String dictation = System.Uri.EscapeDataString(rr.Text);
+      SendRequest(this.dictationUrl + "&dictation=" + dictation);
 
       this.dictationUrl = null;
       return true;
@@ -349,14 +363,64 @@ namespace encausse.net {
       double confidence = GetConfidence(xnav);
 
       if (rr.Confidence < confidence) {
-        log("ENGINE", "Speech rejected: " + rr.Confidence + " Text: " + rr.Text);
+        log("ENGINE", "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Text: " + rr.Text);
         return null;
       }
 
-      log("ENGINE", "Speech recognized: " + rr.Confidence + " Text: " + rr.Text);
+      log("ENGINE", "RECOGNIZED Speech: " + rr.Confidence + " Text: " + rr.Text);
       log(-1, "ENGINE", xnav.OuterXml);
 
       return xnav;
+    }
+
+    protected Boolean HandleWildcard(RecognitionResult rr, String url) {
+      XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
+      XPathNavigator wildcard = xnav.SelectSingleNode("/SML/action/@dictation");
+      if (wildcard == null) { return false; }
+
+      // Store URL
+      this.dictationUrl = url;
+
+      // Dictation in 2 steps
+      if (wildcard.Value == "true") {
+        dictation.Enabled = true;
+      }
+
+      // Wildcards
+      // int word = int.Parse(wildcard.Value);
+      // RecognizedAudio rAudio = rr.GetAudioForWordRange(rr.Words[word], rr.Words[word + 1]);
+      // RecognizedAudio rAudio = rr.GetAudioForWordRange(rr.Words[word], rr.Words[rr.Words.Count - 1]);
+      // SpeechRecognitionEngine sre = GetDictationEngine();
+
+      // Streamer rStream = new Streamer();
+      // rAudio.WriteToAudioStream(rStream);
+      // rStream.Position = 0;
+      //rStream.Flush();
+      //rStream.Close();
+
+      
+      // String dump = "D:/dump_sarah.wav";
+      // if (File.Exists(dump)) { 
+      //   File.Delete(dump);
+      // }
+      // FileStream rStream = new FileStream(dump, FileMode.CreateNew);
+      // rAudio.WriteToWaveStream(rStream);
+      // rStream.Flush();
+      // rStream.Close();
+      // rStream = File.OpenRead(dump);
+
+      // sre.SetInputToAudioStream(rStream, new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
+      // log("ENGINE", "Start dictation");
+      // RecognitionResult result = sre.Recognize();
+      // if (result != null) {
+      //   Console.WriteLine("Recognized text = {0}", result.Text);
+      //   HandleDictation(rr, 0);
+      // }
+
+      // rStream.Flush();
+      // rStream.Close();
+
+      return true;
     }
 
     // ==========================================
@@ -439,13 +503,6 @@ namespace encausse.net {
       return null;
     }
 
-    protected Boolean hasDictation(XPathNavigator xnav) {
-      XPathNavigator dictation = xnav.SelectSingleNode("/SML/action/@dictation");
-      if (dictation == null) { return false; }
-
-      dication.Enabled = true;
-      return true;
-    }
 
     // ==========================================
     //  WSRMacro SPEECH
@@ -454,7 +511,7 @@ namespace encausse.net {
     public void Say(String tts) {
       if (tts == null) { return; }
       speaking = true;
-      log("[TTS] Say: {0}", tts);
+      log("TTS", "Say: "+tts);
       using (SpeechSynthesizer synthesizer = new SpeechSynthesizer()) {
 
         // Configure the audio output.
