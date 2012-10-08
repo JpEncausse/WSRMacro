@@ -1,0 +1,16 @@
+<gestures gestureResetTimeout="500">
+  <gesture description="Bureau Lampe 1 On" maxExecutionTime="1000"  url="http://127.0.0.1:8080/sarah/eedomus?periphId=12350&amp;periphValue=100">
+    <component firstJoint="WristLeft" secondJoint="ShoulderLeft" beginningRelationship="BelowAndLeft" endingRelationship="AboveAndLeft" />
+  </gesture>
+  <gesture description="Bureau Lampe 1 Off" maxExecutionTime="1000" url="http://127.0.0.1:8080/sarah/eedomus?periphId=12350&amp;periphValue=0">
+    <component firstJoint="WristLeft" secondJoint="ShoulderLeft" beginningRelationship="AboveAndLeft" endingRelationship="BelowAndLeft" />
+  </gesture>
+  <gesture description="Bureau Lampe 2 On" maxExecutionTime="1000"  url="http://127.0.0.1:8080/sarah/eedomus?periphId=14646&amp;periphValue=100">
+    <component firstJoint="WristRight" secondJoint="ShoulderRight" beginningRelationship="BelowAndRight" endingRelationship="AboveAndRight" />
+  </gesture>
+  <gesture description="Bureau Lampe 2 Off" maxExecutionTime="1000" url="http://127.0.0.1:8080/sarah/eedomus?periphId=14646&amp;periphValue=0">
+    <component firstJoint="WristRight" secondJoint="ShoulderRight" beginningRelationship="AboveAndRight" endingRelationship="BelowAndRight" />
+  </gesture>
+</gestures>
+
+

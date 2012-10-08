@@ -6,7 +6,7 @@ using NDesk.Options;
 namespace encausse.net {
 
   class WSRLaunch {
-
+    
     static void Main(string[] args) {
 
       bool help = false;
@@ -15,7 +15,7 @@ namespace encausse.net {
       String port = "8080";
       double confidence = 0.75;
       bool kinect = false;
-      bool debug = false;
+      
 
       CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
 
@@ -55,7 +55,6 @@ namespace encausse.net {
       // Run WSRMacro
       WSRMacro macros = kinect ? new WSRKinectMacro(directories, confidence, server, port)
                                : new WSRMacro(directories, confidence, server, port);
-      macros.SetDebug(debug);
 
       // Keep the console window open.
       Console.ReadLine();
@@ -68,6 +67,20 @@ namespace encausse.net {
       Console.WriteLine();
       Console.WriteLine("Options:");
       p.WriteOptionDescriptions(Console.Out);
+    }
+
+    // ==========================================
+    //  LOG
+    // ==========================================
+
+    static bool debug = false;
+    public static void log(string context, string msg) {
+      log(0, context, msg);
+    }
+    public static void log(int level, string context, string msg) {
+      if (level < -1) { return; } // Traces
+      if (level < 0  && !debug) { return; }
+      Console.WriteLine("[{0}] [{1}]\t {2}", DateTime.Now.ToString("yyyy:MM:dd HH:mm:ss"), context, msg);
     }
   }
 }

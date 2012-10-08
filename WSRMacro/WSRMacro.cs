@@ -24,7 +24,7 @@ namespace encausse.net {
    *          Watcher   LoadGrammar    HTTP
    */
 
-  class WSRMacro {
+  public class WSRMacro {
 
     // ==========================================
     //  WSRMacro CONSTRUCTOR
@@ -59,17 +59,11 @@ namespace encausse.net {
       StartRecognizer();
     }
 
-    protected bool debug = false;
-    public void SetDebug(bool debug) {
-      this.debug = debug;
-    }
-
     protected void log(string context, string msg) {
-      log(0, context, msg);
+      WSRLaunch.log(context, msg);
     }
     protected void log(int level, string context, string msg) {
-      if (level < 0 && !debug) { return; }
-      Console.WriteLine("[{0}] [{1}]\t {2}", DateTime.Now.ToString("yyyy:MM:dd HH:mm:ss"), context, msg);
+      WSRLaunch.log(level, context, msg);
     }
 
     // ==========================================
@@ -464,13 +458,16 @@ namespace encausse.net {
       return CONFIDENCE;
     }
 
+    protected String CleanURL(String url) {
+      return url.Replace("http://127.0.0.1:8080", "http://" + server + ":" + port);
+    }
+
     protected String GetURL(XPathNavigator xnav) {
       XPathNavigator xurl = xnav.SelectSingleNode("/SML/action/@uri");
       if (xurl == null) { return null; }
 
       // Build URI
-      String url = xurl.Value + "?";
-      url = url.Replace("http://127.0.0.1:8080", "http://" + server + ":" + port);
+      String url = CleanURL(xurl.Value + "?");
 
       // Build QueryString
       url += GetQueryString(xnav.Select("/SML/action/*"));

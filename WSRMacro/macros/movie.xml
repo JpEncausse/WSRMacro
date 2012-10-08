@@ -50,9 +50,9 @@
 <rule id="ruleMovieName">
   <tag>out.place="B0099";</tag>
   <one-of>
-    <item>Camille Redouble<tag>out.movie="0";</tag></item>
-    <item>Cherchez Hortense<tag>out.movie="1";</tag></item>
-    <item>Broken<tag>out.movie="2";</tag></item>
+    <item>Do Not Disturb<tag>out.movie="0";</tag></item>
+    <item>Les saveurs du palais<tag>out.movie="1";</tag></item>
+    <item>Quelques heures de printemps<tag>out.movie="2";</tag></item>
   </one-of>
 </rule>
 <!-- § Automatic Generation -->

@@ -6,6 +6,7 @@
       <item>Sarah prends une photo<tag>out.action.photo = "true";</tag></item>
       <item>Sarah parle du terrier<tag>out.action.tts = "J'aime les lapins";</tag></item>
       <item>Sarah fait danser le lapin<tag>out.action.play = "http://dl.dropbox.com/u/255810/Temporaire/MP3/Money.mp3";</tag></item>
+      <item>Sarah lance la musique<tag>out.action.play = "http://dl.dropbox.com/u/255810/Temporaire/MP3/Vador.mp3";</tag></item>
     </one-of>
     <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/karotz";</tag>
   </rule>

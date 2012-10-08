@@ -37,7 +37,7 @@
     <StartupObject>encausse.net.WSRLaunch</StartupObject>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Streamer.cs" />
+    <Compile Include="WSRGesture.cs" />
     <Compile Include="WSRKinectMacro.cs" />
     <Compile Include="WSRLaunch.cs" />
     <Compile Include="WSRMacro.cs" />
@@ -50,6 +50,7 @@
       <SubType>Designer</SubType>
     </Content>
     <Content Include="plugins\meteo\meteo.xml" />
+    <Content Include="plugins\vera\vera.xml" />
     <None Include="macros\fr-FR.grxml" />
     <Content Include="macros\eedomus.xml">
       <SubType>Designer</SubType>
@@ -66,6 +67,7 @@
     <Content Include="macros\time.xml">
       <SubType>Designer</SubType>
     </Content>
+    <None Include="macros\swipe.gesture" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
