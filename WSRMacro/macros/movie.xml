@@ -2,6 +2,7 @@
 
   <rule id="ruleMovies">
     <tag>out.action=new Object(); </tag>
+    <item weight="2">Sarah</item>
     <one-of>
       <item><ruleref uri="#ruleMoviePlace"/><tag>out.action = rules.ruleMoviePlace;</tag></item>
       <item><ruleref uri="#ruleMovieTime"/><tag>out.action = rules.ruleMovieTime;</tag></item>
@@ -12,7 +13,6 @@
   <rule id="ruleMoviePlace">
     <example>Sarah qu'est ce qu'il y a au ciné à Vaucresson ?</example>
     <tag>out.place="B0099"; </tag>
-    <item>Sarah</item>
     <one-of>
       <item>il y a quoi au ciné</item>
       <item>il y a quoi au cinéma</item>
@@ -36,8 +36,6 @@
 
   <rule id="ruleMovieTime">
     <example>Sarah a quelle heure passe Eureka ?</example>
-    
-    <item>Sarah</item>
     <one-of>
       <item>a quelle heure passe</item>
       <item>quand passe</item>
@@ -50,9 +48,9 @@
 <rule id="ruleMovieName">
   <tag>out.place="B0099";</tag>
   <one-of>
-    <item>Do Not Disturb<tag>out.movie="0";</tag></item>
-    <item>Les saveurs du palais<tag>out.movie="1";</tag></item>
-    <item>Quelques heures de printemps<tag>out.movie="2";</tag></item>
+    <item>Astérix et Obélix <tag>out.movie="0";</tag></item>
+    <item>Kirikou et les hommes et les femmes<tag>out.movie="1";</tag></item>
+    <item>Dans la maison<tag>out.movie="2";</tag></item>
   </one-of>
 </rule>
 <!-- § Automatic Generation -->

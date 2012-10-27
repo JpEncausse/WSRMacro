@@ -11,11 +11,13 @@ namespace encausse.net {
 
       bool help = false;
       List<string> directories = new List<string>();
+      List<string> context = new List<string>();
       String server = "127.0.0.1";
       String port = "8080";
+      int loopback = 8888; 
       double confidence = 0.75;
       bool kinect = false;
-      
+      bool gesture = false;
 
       CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
 
@@ -24,9 +26,12 @@ namespace encausse.net {
         { "c|confidence=", "the Grammar {CONFIDENCE}. (default is 0.75)", v => confidence = double.Parse(v, culture) },
         { "s|server=", "the NodeJS {SERVER}. (default is 127.0.0.1)", v => server = v },
         { "p|port=", "the NodeJS {PORT}. (default is 8080)", v => port = v },
-        { "k|kinect", "the {KINECT} mode. (default is true)", v => kinect = v != null },
+        { "l|loopback=", "the local {PORT}. (default is 8088)", v => loopback = int.Parse(v, culture) },
+        { "k|kinect", "the {KINECT} mode. (default is false)", v => kinect = v != null },
+        { "g|gesture", "the {KINECT} gesture mode. (default is false)", v => gesture = v != null },
         { "h|help",  "show this message and exit", v => help = v != null },
         { "debug",  "display more debug data", v => debug = v != null },
+        { "ctx|context=",  "starting context", v => context.Add (v) },
       };
 
       // Parsing arguments
@@ -53,8 +58,11 @@ namespace encausse.net {
       }
 
       // Run WSRMacro
-      WSRMacro macros = kinect ? new WSRKinectMacro(directories, confidence, server, port)
-                               : new WSRMacro(directories, confidence, server, port);
+      WSRMacro macros = kinect ? new WSRKinectMacro(directories, confidence, server, port, loopback, context, gesture)
+                               : new WSRMacro(directories, confidence, server, port, loopback, context);
+
+      // Start
+      macros.StartRecognizer();
 
       // Keep the console window open.
       Console.ReadLine();

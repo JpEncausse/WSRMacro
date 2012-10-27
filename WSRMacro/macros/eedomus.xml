@@ -2,7 +2,7 @@
   <rule id="ruleEedomus" scope="public">
     <example>Sarah allume la lampe du salon</example>
     <tag>out.action=new Object(); </tag>
-    <item>Sarah</item>
+    <item weight="2">Sarah</item>
     <one-of>
       <item>allume<tag>out.action.periphValue=100</tag></item>
       <item>eteint<tag>out.action.periphValue=0</tag></item>

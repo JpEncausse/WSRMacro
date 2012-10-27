@@ -2,7 +2,7 @@
   <rule id="ruleMeteo" scope="public">
     <example>Sarah quelle est la météo pour demain ?</example>
     <tag>out.action=new Object(); </tag>
-    <item weight="1.2">Sarah</item>
+    <item weight="2">Sarah</item>
     <one-of>
       <item>quelle est la météo pour demain</item>
       <item>il fait quel temps demain</item>

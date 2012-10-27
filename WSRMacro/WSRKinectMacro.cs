@@ -9,21 +9,25 @@ using Microsoft.Kinect;
 namespace encausse.net {
 
   public class WSRKinectMacro : WSRMacro{
-
+    
     // ==========================================
     //  WSRMacro CONSTRUCTOR
     // ==========================================
 
-    public WSRKinectMacro(List<String> dir, double confidence, String server, String port)
-      : base(dir, confidence, server, port) {
+    public WSRKinectMacro(List<String> dir, double confidence, String server, String port, int loopback, List<string> context, bool gesture)
+      : base(dir, confidence, server, port, loopback, context) {
+      this.gesture = gesture;
     }
 
     // ==========================================
     //  KINECT GESTURE
     // ==========================================
 
-
+    bool gesture = false;
     public void SetupSkeleton(KinectSensor sensor) {
+      if (!gesture) {
+        return;
+      }
       // Build Gesture Manager
       GestureManager mgr = new GestureManager(this);
 
@@ -72,6 +76,18 @@ namespace encausse.net {
       try { sensor.Start(); }
       catch (IOException) { sensor = null; return false; } // Some other application is streaming from the same Kinect sensor
 
+      SetupAudiSource(sensor, sre);
+
+      log("KINECT", "Using Kinect Sensors !"); 
+      return true;
+    }
+
+    protected Boolean SetupAudiSource(KinectSensor sensor, SpeechRecognitionEngine sre) {
+      if (!sensor.IsRunning) {
+        log("KINECT", "Sensor is not running"); 
+        return false;
+      }
+      
       // Use Audio Source to Engine
       KinectAudioSource source = sensor.AudioSource;
 
@@ -84,9 +100,37 @@ namespace encausse.net {
       log(0, "KINECT", "SoundSourceAngleConfidence : " + source.SoundSourceAngleConfidence);
 
       sre.SetInputToAudioStream(source.Start(), new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
-      
-      log("KINECT", "Using Kinect Sensors !"); 
       return true;
     }
+
+    protected override String GetDeviceConfidence() {
+      if (sensor == null) { return ""; }
+      KinectAudioSource source = sensor.AudioSource;
+      if (source == null) { return ""; }
+      return "BeamAngle : " + source.BeamAngle + " "
+           + "SourceAngle : " + source.SoundSourceAngle + " "
+           + "SourceConfidence : " + source.SoundSourceAngleConfidence;
+    }
+
+    // ==========================================
+    //  KINECT STATRT/STOP
+    // ==========================================
+
+    public override void StopRecognizer() {
+      log("KINECT", "StopRecognizer"); 
+      base.StopRecognizer();
+      if (sensor != null) {
+        sensor.Stop();
+      }
+    }
+
+    public override void StartRecognizer() {
+      log("KINECT", "StartRecognizer"); 
+      if (sensor != null) {
+        sensor.Start();
+        SetupAudiSource(sensor, GetEngine()); 
+      }
+      base.StartRecognizer();
+    } 
   }
 }

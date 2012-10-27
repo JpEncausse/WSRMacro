@@ -1,6 +1,6 @@
 <grammar version="1.0" xml:lang="fr-FR" mode="voice" root="ruleCalendar"  tag-format="semantics/1.0" xmlns="http://www.w3.org/2001/06/grammar" xmlns:sapi="http://schemas.microsoft.com/Speech/2002/06/SRGSExtensions">
   <tag>
-    <![CDATA[
+    <![CDATA[ 
     function IsValidDate(month, day, year) 
     {
       var oDate = new Date();
@@ -145,6 +145,7 @@
 
   <rule id="ruleCalendar">
     <tag>out.action=new Object(); </tag>
+    <item weight="2">Sarah</item>
     <one-of>
       <item><ruleref uri="#ruleCheckEvent"/><tag>out.action = rules.ruleCheckEvent;</tag></item>
       <item><ruleref uri="#ruleAddEvent"/><tag>out.action = rules.ruleAddEvent;</tag></item>
@@ -156,7 +157,6 @@
   <rule id="ruleCheckEvent">
     <example>Sarah qu'est ce qui est prévu aujourd'hui ?</example>
     <tag>out.action=new Object(); </tag>
-    <item>Sarah</item>
     <one-of>
       <item>qu'est ce qui est prévu</item>
       <item>quelle est le planning</item>
@@ -172,8 +172,8 @@
     <example>Sarah ajoute un évènement: demain 17h26</example>
     <tag>out._attributes = {}</tag>
     <one-of>
-      <item>Sarah crée un</item>
-      <item>Sarah ajoute un</item>
+      <item>crée un</item>
+      <item>ajoute un</item>
     </one-of>
     <one-of>
       <item>rendez-vous <tag>out.dictation = "Rendez-Vous"</tag></item>
@@ -191,8 +191,8 @@
     <example>Sarah préviens moi dans un quart d'heure</example>
     <tag>out._attributes = {}</tag>
     <one-of>
-      <item>Sarah préviens moi dans</item>
-      <item>Sarah rappel moi dans</item>
+      <item>préviens moi dans</item>
+      <item>rappel moi dans</item>
     </one-of>
     <one-of>
       <item><ruleref uri="#Time_Hour" /><tag>out.hour = rules.latest()</tag></item>

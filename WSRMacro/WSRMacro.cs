@@ -11,6 +11,7 @@ using System.Text;
 using System.Web;
 using System.Globalization;
 using System.Collections.Generic;
+using NHttp;
 
 namespace encausse.net {
   /**
@@ -34,14 +35,17 @@ namespace encausse.net {
     protected double CONFIDENCE_DICTATION = 0.30;
     protected String server = "127.0.0.1";
     protected String port = "8080";
+    protected int loopback = 8888;
     protected List<String> directories = null;
+    protected List<String> context = null;
 
-    public WSRMacro(List<String> dir, double confidence, String server, String port) {
+    public WSRMacro(List<String> dir, double confidence, String server, String port, int loopback, List<string> context) {
 
       this.CONFIDENCE = confidence;
       this.server = server;
       this.port = port;
       this.directories = dir;
+      this.context = context;
 
       log("INIT", "--------------------------------");
       log("INIT", "Windows Speech Recognition Macro");
@@ -55,8 +59,8 @@ namespace encausse.net {
         AddDirectoryWatcher(directory);
       }
 
-      // Start Engine
-      StartRecognizer();
+      // Start HttpServer
+      StartHttpServer(loopback);
     }
 
     protected void log(string context, string msg) {
@@ -106,6 +110,9 @@ namespace encausse.net {
 
       // Start Watching
       StartDirectoryWatcher();
+
+      // Set Context
+      SetContext("default");
     }
 
     protected void LoadGrammar(DirectoryInfo dir) {
@@ -136,6 +143,30 @@ namespace encausse.net {
       sre.LoadGrammar(grammar);
 
       // FIXME: unload grammar with same name ?
+    }
+
+    // ==========================================
+    //  WSRMacro GRAMMAR CONTEXT
+    // ==========================================
+
+    public void SetContext(List<string> context) {
+      if (recognizer == null) { return; }
+      if (context.Count <= 1) { return; }
+      if (context.Count == 1) { SetContext(context[0]); return; }
+      log("GRAMMAR", "Context: " + String.Join(", ", context.ToArray()));
+      foreach (Grammar g in recognizer.Grammars) {
+        g.Enabled = context.Contains(g.Name);
+      }
+    }
+
+    public void SetContext(String context) {
+      if (recognizer == null || context == null) { return; }
+      log("GRAMMAR", "Context: " + context);
+      if ("default".Equals(context)) { SetContext(this.context); return; }
+      bool all = "all".Equals(context);
+      foreach (Grammar g in recognizer.Grammars) {
+        g.Enabled = all || context.Equals(g.Name);
+      }
     }
 
     // ==========================================
@@ -214,16 +245,19 @@ namespace encausse.net {
     */
 
     protected SpeechRecognitionEngine recognizer = null;
-    public void StartRecognizer() {
+    public virtual void StartRecognizer() {
       // Load grammar if needed
       LoadGrammar();
 
       // Start Recognizer
       log("ENGINE", "Start listening");
-      GetEngine().RecognizeAsync(RecognizeMode.Multiple);
+      try {
+        GetEngine().RecognizeAsync(RecognizeMode.Multiple);
+      } 
+      catch(Exception){ log("ENGINE", "No device found"); }
     }
 
-    public void StopRecognizer() {
+    public virtual void StopRecognizer() {
       log("ENGINE", "Stop listening");
       GetEngine().RecognizeAsyncStop();
     }
@@ -332,7 +366,10 @@ namespace encausse.net {
         return;
       }
 
-      // 6. Otherwise send the request
+      // 6. Handle Result's Context
+      HandleContext(xnav);
+
+      // 7. Otherwise send the request
       SendRequest(url); 
     }
 
@@ -349,7 +386,7 @@ namespace encausse.net {
       SendRequest(this.dictationUrl + "&dictation=" + dictation);
 
       this.dictationUrl = null;
-      return true;
+      return true; 
     }
 
     protected XPathNavigator HandleSpeech(RecognitionResult rr) {
@@ -357,14 +394,25 @@ namespace encausse.net {
       double confidence = GetConfidence(xnav);
 
       if (rr.Confidence < confidence) {
-        log("ENGINE", "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Text: " + rr.Text);
+        log("ENGINE", "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Device: " + GetDeviceConfidence() + " Text: " + rr.Text);
         return null;
       }
 
-      log("ENGINE", "RECOGNIZED Speech: " + rr.Confidence + " Text: " + rr.Text);
+      log("ENGINE", "RECOGNIZED Speech: " + rr.Confidence + " Device: " + GetDeviceConfidence() + " Text: " + rr.Text);
       log(-1, "ENGINE", xnav.OuterXml);
 
       return xnav;
+    }
+
+    protected virtual String GetDeviceConfidence() {
+      return "";
+    }
+
+    protected void HandleContext(XPathNavigator xnav) {
+      XPathNavigator ctxt = xnav.SelectSingleNode("/SML/action/@context");
+      if (ctxt != null) {
+        SetContext(new List<string>(ctxt.Value.Split(',')));
+      }
     }
 
     protected Boolean HandleWildcard(RecognitionResult rr, String url) {
@@ -504,6 +552,7 @@ namespace encausse.net {
     // ==========================================
     //  WSRMacro SPEECH
     // ==========================================
+
     protected Boolean speaking = false;
     public void Say(String tts) {
       if (tts == null) { return; }
@@ -520,6 +569,52 @@ namespace encausse.net {
         synthesizer.Speak(builder);
       }
       speaking = false;
+    }
+
+    // ==========================================
+    //  WSRMacro HTTPSERVER
+    // ==========================================
+
+    HttpServer http = null;
+    HttpServer httpLocal = null;
+    public void StartHttpServer(int port) {
+
+      // 192.168.0.x
+      http = new HttpServer();
+      http.EndPoint = new IPEndPoint(GetIpAddress(), port);
+      http.RequestReceived += http_RequestReceived;
+      http.Start();
+      log("INIT", "Starting Server: http://" + http.EndPoint + "/");
+
+      // Localhost
+      httpLocal = new HttpServer();
+      httpLocal.EndPoint = new IPEndPoint(IPAddress.Loopback, port);
+      httpLocal.RequestReceived += http_RequestReceived;
+      httpLocal.Start();
+      log("INIT", "Starting Server: http://" + httpLocal.EndPoint + "/");
+    }
+
+    protected IPAddress GetIpAddress() {
+      IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
+      foreach (IPAddress ip in host.AddressList) {
+        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) {
+          return ip;
+        }
+      }
+      return IPAddress.Loopback;
+    }
+
+    protected void http_RequestReceived(object sender, HttpRequestEventArgs e) {
+      log("HTTP", "Request received: " + e.Request.Url.AbsoluteUri);
+      
+      // Text To Speech
+      String tts = e.Request.Params.Get("tts");
+      if (tts != null){
+        Say(tts);
+      }
+
+      // Fake response
+      using (var writer = new StreamWriter(e.Response.OutputStream)) { writer.Write("S.A.R.A.H is alive"); }
     }
   }
 }

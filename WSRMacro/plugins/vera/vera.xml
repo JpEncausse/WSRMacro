@@ -2,7 +2,7 @@
   <rule id="ruleVera" scope="public">
     <example>Sarah magneto magneto !</example>
     <tag>out.action=new Object(); </tag>
-    <item>Sarah</item>
+    <item weight="2">Sarah</item>
     <one-of>
       <item>magnéto magnéto<tag> out.action.scene="1"; </tag></item>
       <item>met le feu sur le plateau<tag> out.action.scene="2"; </tag></item>

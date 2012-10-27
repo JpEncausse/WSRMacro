@@ -3,7 +3,7 @@
     <example>Sarah Recherche * sur Wikipedia</example>
     <tag>out.action=new Object(); </tag>
 
-    <item>Sarah recherche</item>
+    <item weight="2">Sarah recherche</item>
     <ruleref special="GARBAGE" />
     <item>sur wikipedia</item>
 
