@@ -4,7 +4,7 @@
     <tag>out.action=new Object(); </tag>
     <item weight="2">Sarah</item>
     <one-of>
-      <item>prends une photo<tag>out.action.photo = "true";</tag></item>
+      <item>prends une carotte<tag>out.action.photo = "true";</tag></item>
       <item>parle du terrier<tag>out.action.tts = "J'aime les lapins";</tag></item>
       <item>fait danser le lapin<tag>out.action.play = "http://dl.dropbox.com/u/255810/Temporaire/MP3/Money.mp3"; out.action.timeout=10000</tag></item>
       <item>lance la musique<tag>out.action.play = "http://dl.dropbox.com/u/255810/Temporaire/MP3/Vador.mp3"; out.action.timeout=20000</tag></item>

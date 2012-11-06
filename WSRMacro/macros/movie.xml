@@ -48,9 +48,9 @@
 <rule id="ruleMovieName">
   <tag>out.place="B0099";</tag>
   <one-of>
-    <item>Astérix et Obélix <tag>out.movie="0";</tag></item>
-    <item>Kirikou et les hommes et les femmes<tag>out.movie="1";</tag></item>
-    <item>Dans la maison<tag>out.movie="2";</tag></item>
+    <item>Skyfall<tag>out.movie="0";</tag></item>
+    <item>Stars 80<tag>out.movie="1";</tag></item>
+    <item>Traviata et nous<tag>out.movie="2";</tag></item>
   </one-of>
 </rule>
 <!-- § Automatic Generation -->

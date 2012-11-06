@@ -12,6 +12,10 @@ using System.Web;
 using System.Globalization;
 using System.Collections.Generic;
 using NHttp;
+using NAudio;
+using NAudio.Wave;
+using System.Drawing;
+using System.Drawing.Imaging;
 
 namespace encausse.net {
   /**
@@ -25,7 +29,7 @@ namespace encausse.net {
    *          Watcher   LoadGrammar    HTTP
    */
 
-  public class WSRMacro {
+  public partial class WSRMacro { 
 
     // ==========================================
     //  WSRMacro CONSTRUCTOR
@@ -38,6 +42,7 @@ namespace encausse.net {
     protected int loopback = 8888;
     protected List<String> directories = null;
     protected List<String> context = null;
+    protected bool hasContext = false;
 
     public WSRMacro(List<String> dir, double confidence, String server, String port, int loopback, List<string> context) {
 
@@ -46,6 +51,10 @@ namespace encausse.net {
       this.port = port;
       this.directories = dir;
       this.context = context;
+      this.hasContext = context != null && context.Count > 0;
+
+      //PlayMP3(@"medias\Wargames (extrait Fr) 1983.mp3");
+      //PlayMP3("https://dl.dropbox.com/u/255810/Temporaire/MP3/Wargames%20%28extrait%20Fr%29%201983.mp3");
 
       log("INIT", "--------------------------------");
       log("INIT", "Windows Speech Recognition Macro");
@@ -82,6 +91,10 @@ namespace encausse.net {
 
       if (!reload) {
         return;
+      }
+
+      if (!hasContext) {
+        this.context = new List<string>();
       }
 
       // Stop Watching
@@ -135,12 +148,18 @@ namespace encausse.net {
 
       // Create a Grammar from file
       Grammar grammar = new Grammar(file);
-      grammar.Enabled = true;
+      grammar.Enabled = !grammar.RuleName.StartsWith("lazy");
       grammar.Name = name;
 
       // Load the grammar object into the recognizer.
       SpeechRecognitionEngine sre = GetEngine();
       sre.LoadGrammar(grammar);
+
+      // Add to context if there is no context
+      if (!hasContext && grammar.Enabled) {
+        this.context.Add(name);
+        log("GRAMMAR", "Add to context list: " + name );
+      }
 
       // FIXME: unload grammar with same name ?
     }
@@ -151,11 +170,13 @@ namespace encausse.net {
 
     public void SetContext(List<string> context) {
       if (recognizer == null) { return; }
-      if (context.Count <= 1) { return; }
+      if (context.Count < 1) { return; }
       if (context.Count == 1) { SetContext(context[0]); return; }
       log("GRAMMAR", "Context: " + String.Join(", ", context.ToArray()));
       foreach (Grammar g in recognizer.Grammars) {
+        if (g.Name == "dictation") { continue; }
         g.Enabled = context.Contains(g.Name);
+        log("CONTEXT", g.Name + " = " + g.Enabled);
       }
     }
 
@@ -165,7 +186,9 @@ namespace encausse.net {
       if ("default".Equals(context)) { SetContext(this.context); return; }
       bool all = "all".Equals(context);
       foreach (Grammar g in recognizer.Grammars) {
+        if (g.Name == "dictation") { continue; }
         g.Enabled = all || context.Equals(g.Name);
+        log("CONTEXT", g.Name + " = " + g.Enabled);
       }
     }
 
@@ -260,6 +283,7 @@ namespace encausse.net {
     public virtual void StopRecognizer() {
       log("ENGINE", "Stop listening");
       GetEngine().RecognizeAsyncStop();
+      log("ENGINE", "Stop listening...done");
     }
 
     public SpeechRecognitionEngine GetEngine() {
@@ -354,9 +378,8 @@ namespace encausse.net {
         return;
       }
 
-      // 3. Parse Result's TTS
-      String tts = GetTTS(xnav);
-      Say(tts);
+      // 3 Hook
+      String path = HandleCustomAttributes(xnav);
 
       // 4. Parse Result's URL
       String url = GetURL(xnav);
@@ -366,11 +389,8 @@ namespace encausse.net {
         return;
       }
 
-      // 6. Handle Result's Context
-      HandleContext(xnav);
-
-      // 7. Otherwise send the request
-      SendRequest(url); 
+      // 6. Otherwise send the request
+      SendRequest(url, path); 
     }
 
     protected bool HandleDictation(RecognitionResult rr, double confidence) {
@@ -429,38 +449,18 @@ namespace encausse.net {
       }
 
       // Wildcards
-      // int word = int.Parse(wildcard.Value);
-      // RecognizedAudio rAudio = rr.GetAudioForWordRange(rr.Words[word], rr.Words[word + 1]);
-      // RecognizedAudio rAudio = rr.GetAudioForWordRange(rr.Words[word], rr.Words[rr.Words.Count - 1]);
-      // SpeechRecognitionEngine sre = GetDictationEngine();
+      int word = int.Parse(wildcard.Value);
 
-      // Streamer rStream = new Streamer();
-      // rAudio.WriteToAudioStream(rStream);
-      // rStream.Position = 0;
-      //rStream.Flush();
-      //rStream.Close();
-
+      /* == DUMP AUDIO STREAM TO FILE ==========================================
+       * http://msdn.microsoft.com/en-us/library/system.speech.recognition.recognitionresult.audio.aspx
       
-      // String dump = "D:/dump_sarah.wav";
-      // if (File.Exists(dump)) { 
-      //   File.Delete(dump);
-      // }
-      // FileStream rStream = new FileStream(dump, FileMode.CreateNew);
-      // rAudio.WriteToWaveStream(rStream);
-      // rStream.Flush();
-      // rStream.Close();
-      // rStream = File.OpenRead(dump);
-
-      // sre.SetInputToAudioStream(rStream, new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
-      // log("ENGINE", "Start dictation");
-      // RecognitionResult result = sre.Recognize();
-      // if (result != null) {
-      //   Console.WriteLine("Recognized text = {0}", result.Text);
-      //   HandleDictation(rr, 0);
-      // }
-
-      // rStream.Flush();
-      // rStream.Close();
+      RecognizedAudio rAudio = rr.Audio;
+      String dump = "D:/dump_sarah.wav";
+      FileStream rStream = new FileStream(dump, FileMode.CreateNew);
+      rAudio.WriteToWaveStream(rStream);
+      rStream.Flush();
+      rStream.Close(); 
+      */
 
       return true;
     }
@@ -468,27 +468,43 @@ namespace encausse.net {
     // ==========================================
     //  WSRMacro HTTP
     // ==========================================
-
+    
     protected void SendRequest(String url) {
       if (url == null) { return; }
 
       log("HTTP", "Build HttpRequest: " + url);
-
+      
       HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
       req.Method = "GET";
-
+      
       log("HTTP", "Send HttpRequest: " + req.Address);
 
       try {
         HttpWebResponse res = (HttpWebResponse)req.GetResponse();
-        log("HTTP", "Response status: " + res.StatusCode);
-
-        // Handle Response
         using (StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8)) {
-          Say(sr.ReadToEnd());
+          Speak(sr.ReadToEnd());
         }
       }
       catch (WebException ex) {
+        log("HTTP", "Exception: " + ex.Message);
+      }
+    }
+
+    protected void SendRequest(String url, String path) {
+      if (url == null) { return; }
+      if (path == null) { SendRequest(url); return; }
+
+      log("HTTP", "Build HttpRequest: " + url);
+
+      WebClient client = new WebClient();
+      client.Headers.Add("user-agent", "S.A.R.A.H. (Self Actuated Residential Automated Habitat)");
+
+      try {
+        byte[] responseArray = client.UploadFile(url, path);
+        String response = System.Text.Encoding.ASCII.GetString(responseArray);
+        Speak(response);
+      }
+      catch (Exception ex) {
         log("HTTP", "Exception: " + ex.Message);
       }
     }
@@ -542,22 +558,87 @@ namespace encausse.net {
       return qs;
     }
 
-    protected String GetTTS(XPathNavigator xnav) {
+    protected void HandleTTS(XPathNavigator xnav) {
       XPathNavigator tts = xnav.SelectSingleNode("/SML/action/@tts");
-      if (tts != null) { return tts.Value; }
+      if (tts != null) {
+        Speak(tts.Value);
+      }
+    }
+
+    protected void HandlePlay(XPathNavigator xnav) {
+      XPathNavigator play = xnav.SelectSingleNode("/SML/action/@play");
+      if (play != null) {
+        PlayMP3(play.Value); 
+      }
+    }
+
+    protected virtual String HandleCustomAttributes(XPathNavigator xnav) {
+      // 3.1 Parse Result's TTS
+      HandleTTS(xnav);
+
+      // 3.2 Parse Result's Play
+      HandlePlay(xnav);
+
+      // 3.3 Handle Result's Context
+      HandleContext(xnav);
+
       return null;
     }
 
+    // ==========================================
+    //  WSRMacro GOOGLE
+    // http://stackoverflow.com/questions/8778624/trying-to-use-google-speech2text-in-c-sharp
+    // ==========================================
+    /*
+    public void ProcessAudioStream(Stream stream) {
+
+      String url = "https://www.google.com/speech-api/v1/recognize?xjerr=1&client=speech2text&lang=fr-FR&maxresults=2";
+      ServicePointManager.ServerCertificateValidationCallback += delegate { return true; };
+      
+      HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(url);
+      request.Timeout = 60000;
+      request.Method = "POST";
+      request.KeepAlive = true;
+      request.ContentType = "audio/x-flac; rate=16000";
+      request.UserAgent = "speech2text";
+
+      // Read Flac data
+      byte[] data = new byte[stream.Length];
+      stream.Read(data, 0, (int)stream.Length);
+      stream.Close();
+
+      using (Stream wrStream = request.GetRequestStream())
+        wrStream.Write(data, 0, data.Length);
+
+      try {
+        HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+        var resp = response.GetResponseStream();
+
+        if (resp != null) {
+          StreamReader sr = new StreamReader(resp);
+          log("GOOGLE", sr.ReadToEnd());
+
+          resp.Close();
+          resp.Dispose();
+        }
+      }
+      catch (System.Exception ex) {
+        log("GOOGLE", ex.ToString());
+      }
+    }
+    */
 
     // ==========================================
     //  WSRMacro SPEECH
     // ==========================================
 
     protected Boolean speaking = false;
-    public void Say(String tts) {
-      if (tts == null) { return; }
+    public bool Speak(String tts) {
+      
+      if (tts == null) { return false; }
+      log("TTS", "Say: " + tts);
+
       speaking = true;
-      log("TTS", "Say: "+tts);
       using (SpeechSynthesizer synthesizer = new SpeechSynthesizer()) {
 
         // Configure the audio output.
@@ -569,6 +650,65 @@ namespace encausse.net {
         synthesizer.Speak(builder);
       }
       speaking = false;
+      return true;
+    }
+
+    // ==========================================
+    //  WSRMacro PLAY
+    // ==========================================
+
+    private bool PlayMP3(string fileName){
+
+      if (fileName == null) { return false; }
+
+      if (fileName.StartsWith("http")) {
+        return StreamMP3(fileName);
+      }
+
+      Console.WriteLine("PLAYER", "Start MP3 Player");
+      using (var ms = File.OpenRead(fileName))
+      using (var mp3Reader = new Mp3FileReader(ms))
+      using (var pcmStream = WaveFormatConversionStream.CreatePcmStream(mp3Reader))
+      using (var baStream = new BlockAlignReductionStream(pcmStream))
+      using (var waveOut = new WaveOut(WaveCallbackInfo.FunctionCallback())) {
+        waveOut.Init(baStream);
+        waveOut.Play();
+        while (baStream.CurrentTime < baStream.TotalTime) {
+          Thread.Sleep(100);
+        }
+      }
+
+      Console.WriteLine("PLAYER", "End MP3 Player");
+      return true;
+    }
+
+    private bool StreamMP3(string url) {
+
+      if (url == null) { return false; }
+      Console.WriteLine("PLAYER", "Stream MP3 Player");
+
+      using (var ms = new MemoryStream()) 
+      using (var stream = WebRequest.Create(url).GetResponse().GetResponseStream()){
+        byte[] buffer = new byte[32768];
+        int read;
+        while ((read = stream.Read(buffer, 0, buffer.Length)) > 0) {
+          ms.Write(buffer, 0, read);
+        }
+        ms.Position = 0;
+        using (var mp3Reader = new Mp3FileReader(ms))
+        using (var pcmStream = WaveFormatConversionStream.CreatePcmStream(mp3Reader))
+        using (var baStream = new BlockAlignReductionStream(pcmStream))
+        using (var waveOut = new WaveOut(WaveCallbackInfo.FunctionCallback())) {
+          waveOut.Init(baStream);
+          waveOut.Play();
+          while (baStream.CurrentTime < baStream.TotalTime) {
+            Thread.Sleep(100);
+          }
+        }
+      }
+
+      Console.WriteLine("PLAYER", "End MP3 Player");
+      return true;
     }
 
     // ==========================================
@@ -606,15 +746,41 @@ namespace encausse.net {
 
     protected void http_RequestReceived(object sender, HttpRequestEventArgs e) {
       log("HTTP", "Request received: " + e.Request.Url.AbsoluteUri);
-      
-      // Text To Speech
-      String tts = e.Request.Params.Get("tts");
-      if (tts != null){
-        Say(tts);
+
+      if (HandleCustomRequest(e)) {
+        return;
       }
 
       // Fake response
-      using (var writer = new StreamWriter(e.Response.OutputStream)) { writer.Write("S.A.R.A.H is alive"); }
+      var os = e.Response.OutputStream;
+      os.Flush();
+      os.Close();
+    }
+
+    protected virtual bool HandleCustomRequest(HttpRequestEventArgs e) {
+      // Text To Speech
+      Speak(e.Request.Params.Get("tts"));
+
+      // Play Music
+      PlayMP3(e.Request.Params.Get("play"));
+
+      // Set Context
+      String ctxt = e.Request.Params.Get("context");
+      if (ctxt != null) {
+        SetContext(new List<string>(ctxt.Split(',')));
+      }
+
+      // Start / Stop recognizer
+      /* Seems to be broken ...
+      if (e.Request.Params.Get("start") != null) {
+        StartRecognizer();
+      }
+      if (e.Request.Params.Get("stop") != null) {
+        StopRecognizer();
+      }
+      */
+
+      return false;
     }
   }
 }

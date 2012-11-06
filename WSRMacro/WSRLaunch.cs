@@ -18,6 +18,8 @@ namespace encausse.net {
       double confidence = 0.75;
       bool kinect = false;
       bool gesture = false;
+      bool picture = false;
+      int websocket = -1;
 
       CultureInfo culture = CultureInfo.CreateSpecificCulture("en-US");
 
@@ -29,9 +31,11 @@ namespace encausse.net {
         { "l|loopback=", "the local {PORT}. (default is 8088)", v => loopback = int.Parse(v, culture) },
         { "k|kinect", "the {KINECT} mode. (default is false)", v => kinect = v != null },
         { "g|gesture", "the {KINECT} gesture mode. (default is false)", v => gesture = v != null },
+        { "f|picture", "the {KINECT} picture mode. (default is false)", v => picture = v != null },
         { "h|help",  "show this message and exit", v => help = v != null },
         { "debug",  "display more debug data", v => debug = v != null },
-        { "ctx|context=",  "starting context", v => context.Add (v) },
+        { "ctx|context=",  "the starting context files", v => context.Add (v) },
+        { "sck|websocket=",  "the websocket server port", v => websocket = int.Parse(v, culture) },
       };
 
       // Parsing arguments
@@ -58,7 +62,7 @@ namespace encausse.net {
       }
 
       // Run WSRMacro
-      WSRMacro macros = kinect ? new WSRKinectMacro(directories, confidence, server, port, loopback, context, gesture)
+      WSRMacro macros = kinect ? new WSRKinectMacro(directories, confidence, server, port, loopback, context, gesture, picture, websocket)
                                : new WSRMacro(directories, confidence, server, port, loopback, context);
 
       // Start
