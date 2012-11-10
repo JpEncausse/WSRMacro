@@ -284,6 +284,9 @@ namespace encausse.net {
         return false;
       }
 
+      // Play sound effect for feedback
+      PlayMP3("medias/qrcode.mp3");
+
       // Do something with the result
       String type = result.BarcodeFormat.ToString();
       String content = result.Text;
@@ -377,7 +380,7 @@ namespace encausse.net {
       try { sensor.Start(); }
       catch (IOException) { sensor = null; return; } // Some other application is streaming from the same Kinect sensor
     }
-
+    /*
     public override void StopRecognizer() { 
       base.StopRecognizer();
       log("KINECT", "Stop sensor"); 
@@ -395,6 +398,7 @@ namespace encausse.net {
       }
       log("KINECT", "Start sensor...done");
       base.StartRecognizer();
-    } 
+    }
+    */
   }
 }

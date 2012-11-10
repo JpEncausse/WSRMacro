@@ -1,0 +1,14 @@
+<grammar version="1.0" xml:lang="fr-FR" mode="voice" root="ruleWerewolf" xmlns="http://www.w3.org/2001/06/grammar" tag-format="semantics/1.0">
+  <rule id="ruleWerewolf" scope="public">
+    <example>Sarah on joue à loup garou</example>
+    <tag>out.action=new Object(); </tag>
+    <item weight="2">Sarah</item>
+    <one-of>
+      <item>on joue à Loup Garou<tag> out.action.init="true"; </tag></item>
+      <item>tous les joueurs sont prêts<tag> out.action.start="true"; </tag></item>
+      <item>combien <ruleref special="GARBAGE"/> Loup Garou<tag> out.action.query="werewolf"; </tag></item>
+      <item>qui est le maire<tag> out.action.query="mayer"; </tag></item>
+    </one-of>
+    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/werewolf";</tag>
+  </rule>
+</grammar>

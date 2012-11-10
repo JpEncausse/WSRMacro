@@ -657,7 +657,9 @@ namespace encausse.net {
     //  WSRMacro PLAY
     // ==========================================
 
-    private bool PlayMP3(string fileName){
+    List<String> played = new List<String>();
+
+    public bool PlayMP3(string fileName) {
 
       if (fileName == null) { return false; }
 
@@ -665,7 +667,8 @@ namespace encausse.net {
         return StreamMP3(fileName);
       }
 
-      Console.WriteLine("PLAYER", "Start MP3 Player");
+      speaking = true;
+      log("PLAYER", "Start MP3 Player");
       using (var ms = File.OpenRead(fileName))
       using (var mp3Reader = new Mp3FileReader(ms))
       using (var pcmStream = WaveFormatConversionStream.CreatePcmStream(mp3Reader))
@@ -673,19 +676,25 @@ namespace encausse.net {
       using (var waveOut = new WaveOut(WaveCallbackInfo.FunctionCallback())) {
         waveOut.Init(baStream);
         waveOut.Play();
-        while (baStream.CurrentTime < baStream.TotalTime) {
+        played.Add(fileName);
+        while (baStream.CurrentTime < baStream.TotalTime && played.Contains(fileName)) {
           Thread.Sleep(100);
         }
+        played.Remove(fileName);
+        waveOut.Stop();
+        
       }
-
-      Console.WriteLine("PLAYER", "End MP3 Player");
+      log("PLAYER", "End MP3 Player");
+      speaking = false;
       return true;
     }
 
-    private bool StreamMP3(string url) {
+    public bool StreamMP3(string url) {
 
       if (url == null) { return false; }
-      Console.WriteLine("PLAYER", "Stream MP3 Player");
+
+      speaking = true;
+      log("PLAYER", "Stream MP3 Player");
 
       using (var ms = new MemoryStream()) 
       using (var stream = WebRequest.Create(url).GetResponse().GetResponseStream()){
@@ -701,13 +710,23 @@ namespace encausse.net {
         using (var waveOut = new WaveOut(WaveCallbackInfo.FunctionCallback())) {
           waveOut.Init(baStream);
           waveOut.Play();
-          while (baStream.CurrentTime < baStream.TotalTime) {
+          played.Add(url);
+          while (baStream.CurrentTime < baStream.TotalTime && played.Contains(url)) {
             Thread.Sleep(100);
           }
+          played.Remove(url);
+          waveOut.Stop();
         }
       }
 
-      Console.WriteLine("PLAYER", "End MP3 Player");
+      log("PLAYER", "End MP3 Player");
+      speaking = false;
+      return true;
+    }
+
+    private bool StopMP3(string key) {
+      if (key == null) { return false; }
+      played.Remove(key);
       return true;
     }
 
@@ -752,33 +771,37 @@ namespace encausse.net {
       }
 
       // Fake response
-      var os = e.Response.OutputStream;
-      os.Flush();
-      os.Close();
+      using (var writer = new StreamWriter(e.Response.OutputStream)) {
+        writer.Write(" ");
+      }
     }
 
     protected virtual bool HandleCustomRequest(HttpRequestEventArgs e) {
-      // Text To Speech
-      Speak(e.Request.Params.Get("tts"));
+
+      // Stop Music
+      String pause = e.Request.Params.Get("pause");
+      if (pause != null) {
+        StopMP3(pause);
+      }
 
       // Play Music
-      PlayMP3(e.Request.Params.Get("play"));
+      String mp3 = e.Request.Params.Get("play");
+      if (mp3 != null) {
+        PlayMP3(mp3);
+      }
+
+      // Text To Speech
+      String tts = e.Request.Params.Get("tts");
+      if (tts != null) {
+        tts = e.Server.HtmlDecode(tts);
+        Speak(tts);
+      }
 
       // Set Context
       String ctxt = e.Request.Params.Get("context");
       if (ctxt != null) {
         SetContext(new List<string>(ctxt.Split(',')));
       }
-
-      // Start / Stop recognizer
-      /* Seems to be broken ...
-      if (e.Request.Params.Get("start") != null) {
-        StartRecognizer();
-      }
-      if (e.Request.Params.Get("stop") != null) {
-        StopRecognizer();
-      }
-      */
 
       return false;
     }

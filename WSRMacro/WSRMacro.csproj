@@ -57,6 +57,9 @@
     </Content>
     <Content Include="plugins\meteo\meteo.xml" />
     <Content Include="plugins\vera\vera.xml" />
+    <Content Include="plugins\werewolf\werewolf.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <None Include="macros\fr-FR.grxml" />
     <Content Include="macros\eedomus.xml">
       <SubType>Designer</SubType>
@@ -93,8 +96,9 @@
     <Reference Include="NDesk.Options">
       <HintPath>..\packages\NDesk.Options.0.2.1\lib\NDesk.Options.dll</HintPath>
     </Reference>
-    <Reference Include="NHttp">
-      <HintPath>..\packages\NHttp.0.1.3.0\lib\net20\NHttp.dll</HintPath>
+    <Reference Include="NHttp, Version=0.1.4.0, Culture=neutral, PublicKeyToken=156364e4f7b202d9, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\NHttp.0.1.4.0\lib\net20\NHttp.dll</HintPath>
     </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="System" />
