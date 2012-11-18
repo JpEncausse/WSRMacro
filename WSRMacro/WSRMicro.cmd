@@ -1,0 +1,1 @@
+"%cd%\bin\Release\WSRMacro.exe" -d macros -d plugins -c 0.60 -f 

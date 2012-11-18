@@ -16,6 +16,7 @@ using NAudio;
 using NAudio.Wave;
 using System.Drawing;
 using System.Drawing.Imaging;
+using CloudSpeech;
 
 namespace encausse.net {
   /**
@@ -52,9 +53,6 @@ namespace encausse.net {
       this.directories = dir;
       this.context = context;
       this.hasContext = context != null && context.Count > 0;
-
-      //PlayMP3(@"medias\Wargames (extrait Fr) 1983.mp3");
-      //PlayMP3("https://dl.dropbox.com/u/255810/Temporaire/MP3/Wargames%20%28extrait%20Fr%29%201983.mp3");
 
       log("INIT", "--------------------------------");
       log("INIT", "Windows Speech Recognition Macro");
@@ -296,7 +294,7 @@ namespace encausse.net {
       recognizer.SpeechRecognized += new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
       recognizer.RecognizeCompleted += new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
       recognizer.AudioStateChanged += new EventHandler<AudioStateChangedEventArgs>(recognizer_AudioStateChanged);
-
+      recognizer.SpeechHypothesized += new EventHandler<SpeechHypothesizedEventArgs>(recognizer_SpeechHypothesized);
       // Alternate
       recognizer.MaxAlternates = 2;
       log("ENGINE", "MaxAlternates: " + recognizer.MaxAlternates);
@@ -314,6 +312,8 @@ namespace encausse.net {
       return recognizer;
     }
 
+    protected void recognizer_SpeechHypothesized(object sender, SpeechHypothesizedEventArgs e) {}
+    
     protected void recognizer_RecognizeCompleted(object sender, RecognizeCompletedEventArgs e) {
       String resultText = e.Result != null ? e.Result.Text : "<null>";
       log("ENGINE", "RecognizeCompleted (" + DateTime.Now.ToString("mm:ss.f") + "): " + resultText);
@@ -385,7 +385,8 @@ namespace encausse.net {
       String url = GetURL(xnav);
 
       // 5. Parse Result's Dication
-      if (HandleWildcard(rr, url)) {
+      url = HandleWildcard(rr, url);
+      if (url == null) {
         return;
       }
 
@@ -435,10 +436,10 @@ namespace encausse.net {
       }
     }
 
-    protected Boolean HandleWildcard(RecognitionResult rr, String url) {
+    protected String HandleWildcard(RecognitionResult rr, String url) {
       XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
       XPathNavigator wildcard = xnav.SelectSingleNode("/SML/action/@dictation");
-      if (wildcard == null) { return false; }
+      if (wildcard == null) { return url; }
 
       // Store URL
       this.dictationUrl = url;
@@ -446,6 +447,7 @@ namespace encausse.net {
       // Dictation in 2 steps
       if (wildcard.Value == "true") {
         dictation.Enabled = true;
+        return null;
       }
 
       // Wildcards
@@ -453,16 +455,23 @@ namespace encausse.net {
 
       /* == DUMP AUDIO STREAM TO FILE ==========================================
        * http://msdn.microsoft.com/en-us/library/system.speech.recognition.recognitionresult.audio.aspx
-      
-      RecognizedAudio rAudio = rr.Audio;
-      String dump = "D:/dump_sarah.wav";
-      FileStream rStream = new FileStream(dump, FileMode.CreateNew);
-      rAudio.WriteToWaveStream(rStream);
-      rStream.Flush();
-      rStream.Close(); 
-      */
+       */
 
-      return true;
+      // Google
+      using (MemoryStream audioStream = new MemoryStream()) {
+        // rr.Audio.WriteToWaveStream(audioStream);
+        rr.GetAudioForWordRange(rr.Words[word], rr.Words[word]).WriteToWaveStream(audioStream);
+        audioStream.Position = 0;
+        url += "&dictation="+ProcessAudioStream(audioStream);
+
+        /*
+        if (File.Exists("D:/dump_sarah.wav")){ File.Delete("D:/dump_sarah.wav"); }
+        using (FileStream fileStream = new FileStream("D:/dump_sarah.wav", FileMode.CreateNew)) {
+          rr.GetAudioForWordRange(rr.Words[word], rr.Words[word]).WriteToWaveStream(fileStream);
+        }
+        */
+      }
+      return url;
     }
 
     // ==========================================
@@ -587,46 +596,20 @@ namespace encausse.net {
 
     // ==========================================
     //  WSRMacro GOOGLE
-    // http://stackoverflow.com/questions/8778624/trying-to-use-google-speech2text-in-c-sharp
+    // // https://bitbucket.org/josephcooney/cloudspeech/src/8619cf699541?at=default
     // ==========================================
-    /*
-    public void ProcessAudioStream(Stream stream) {
 
-      String url = "https://www.google.com/speech-api/v1/recognize?xjerr=1&client=speech2text&lang=fr-FR&maxresults=2";
-      ServicePointManager.ServerCertificateValidationCallback += delegate { return true; };
-      
-      HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(url);
-      request.Timeout = 60000;
-      request.Method = "POST";
-      request.KeepAlive = true;
-      request.ContentType = "audio/x-flac; rate=16000";
-      request.UserAgent = "speech2text";
-
-      // Read Flac data
-      byte[] data = new byte[stream.Length];
-      stream.Read(data, 0, (int)stream.Length);
-      stream.Close();
-
-      using (Stream wrStream = request.GetRequestStream())
-        wrStream.Write(data, 0, data.Length);
-
-      try {
-        HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-        var resp = response.GetResponseStream();
-
-        if (resp != null) {
-          StreamReader sr = new StreamReader(resp);
-          log("GOOGLE", sr.ReadToEnd());
-
-          resp.Close();
-          resp.Dispose();
-        }
+    public String ProcessAudioStream(Stream stream) {
+      log("GOOGLE", "ProcessAudioStream");
+      CultureInfo culture = new System.Globalization.CultureInfo("fr-FR");
+      var stt = new SpeechToText("https://www.google.com/speech-api/v1/recognize?xjerr=1&client=chromium&maxresults=2", culture);
+      var response = stt.Recognize(stream);
+      foreach(TextResponse res in response){
+        log("GOOGLE", "Confidence: " + res.Confidence + " Utterance " + res.Utterance);
+        return res.Utterance;
       }
-      catch (System.Exception ex) {
-        log("GOOGLE", ex.ToString());
-      }
+      return null;
     }
-    */
 
     // ==========================================
     //  WSRMacro SPEECH

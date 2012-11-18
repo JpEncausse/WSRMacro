@@ -44,44 +44,40 @@
     <Compile Include="WSRMacro.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="macros\calendar.xml">
-      <SubType>Designer</SubType>
-    </Content>
-    <Content Include="macros\chatterbot.xml" />
-    <Content Include="macros\context.xml" />
-    <Content Include="macros\kinect.xml">
-      <SubType>Designer</SubType>
-    </Content>
-    <Content Include="macros\wildcard.xml">
-      <SubType>Designer</SubType>
-    </Content>
+    <Content Include="plugins\calendar\calendar.xml" />
+    <Content Include="plugins\chatterbot\chatterbot.xml" />
+    <Content Include="plugins\chatterbot\context.xml" />
+    <Content Include="plugins\dictionary\dictionary.xml" />
+    <Content Include="plugins\eedomus\eedomus.xml" />
+    <Content Include="plugins\karotz\karotz.xml" />
+    <Content Include="plugins\kinect\kinect.xml" />
     <Content Include="plugins\meteo\meteo.xml" />
+    <Content Include="plugins\movie\movie.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="plugins\vera\vera.xml" />
     <Content Include="plugins\werewolf\werewolf.xml">
-      <SubType>Designer</SubType>
-    </Content>
-    <None Include="macros\fr-FR.grxml" />
-    <Content Include="macros\eedomus.xml">
-      <SubType>Designer</SubType>
-    </Content>
-    <Content Include="macros\karotz.xml">
-      <SubType>Designer</SubType>
-    </Content>
-    <Content Include="macros\meteo.xml">
-      <SubType>Designer</SubType>
-    </Content>
-    <Content Include="macros\movie.xml">
       <SubType>Designer</SubType>
     </Content>
     <Content Include="macros\time.xml">
       <SubType>Designer</SubType>
     </Content>
-    <None Include="macros\swipe.gesture" />
     <None Include="packages.config" />
+    <None Include="plugins\calendar\fr-FR.grxml" />
+    <None Include="plugins\eedomus\eedomus.gesture" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="CloudSpeech">
+      <HintPath>dll\CloudSpeech.dll</HintPath>
+    </Reference>
     <Reference Include="Common.Logging">
       <HintPath>..\packages\Common.Logging.2.0.0\lib\2.0\Common.Logging.dll</HintPath>
+    </Reference>
+    <Reference Include="CUETools.Codecs">
+      <HintPath>dll\CUETools.Codecs.dll</HintPath>
+    </Reference>
+    <Reference Include="CUETools.Codecs.FLAKE">
+      <HintPath>dll\CUETools.Codecs.FLAKE.dll</HintPath>
     </Reference>
     <Reference Include="Fleck">
       <HintPath>..\packages\Fleck.0.9.6.14\lib\net40\Fleck.dll</HintPath>
@@ -118,6 +114,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="medias\" />
+    <Folder Include="plugins\mail\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
