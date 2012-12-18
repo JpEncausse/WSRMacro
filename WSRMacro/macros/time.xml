@@ -10,6 +10,6 @@
       <item>tu peux me donner l'heure</item>
     </one-of>
     <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/time";</tag>
-    <tag>out.action._attributes.threashold="0.85";</tag>
+    <tag>out.action._attributes.threashold="0.70";</tag>
   </rule>
 </grammar>

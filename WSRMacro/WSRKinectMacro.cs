@@ -26,8 +26,8 @@ namespace encausse.net {
     //  WSRMacro CONSTRUCTOR
     // ==========================================
 
-    public WSRKinectMacro(List<String> dir, double confidence, String server, String port, int loopback, List<string> context, bool gesture, bool picture, int websocket)
-      : base(dir, confidence, server, port, loopback, context) {
+    public WSRKinectMacro (List<String> dir, double confidence, double trigger, String server, String port, int loopback, List<string> context, bool gesture, bool picture, int websocket)
+      : base(dir, confidence, trigger, server, port, loopback, context) {
       this.gesture = gesture;
       this.picture = picture;
       this.wckport = websocket;
@@ -328,6 +328,9 @@ namespace encausse.net {
       
       // Use Audio Source to Engine
       KinectAudioSource source = sensor.AudioSource;
+      source.EchoCancellationMode = EchoCancellationMode.CancellationAndSuppression;
+      source.NoiseSuppression = true;
+      source.BeamAngleMode = BeamAngleMode.Adaptive; //set the beam to adapt to the surrounding
 
       log(0, "KINECT", "AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
       log(0, "KINECT", "BeamAngle : " + source.BeamAngle);

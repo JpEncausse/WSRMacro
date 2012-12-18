@@ -64,7 +64,8 @@
     </Content>
     <None Include="packages.config" />
     <None Include="plugins\calendar\fr-FR.grxml" />
-    <None Include="plugins\eedomus\eedomus.gesture" />
+    <None Include="plugins\eedomus\eedomus.gbkp" />
+    <None Include="plugins\gesture\gesture.gesture" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="CloudSpeech">

@@ -16,6 +16,8 @@ local.properties
 .settings/
 .loadpath
 packages/
+WSRMacro/dump
+WSRMacro/medias/Kinect*
 
 # External tool builders
 .externalToolBuilders/

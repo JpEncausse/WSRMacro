@@ -37,6 +37,7 @@ namespace encausse.net {
     // ==========================================
 
     protected double CONFIDENCE = 0.75;
+    protected double CONFIDENCE_TRIGGER = 0.92;
     protected double CONFIDENCE_DICTATION = 0.30;
     protected String server = "127.0.0.1";
     protected String port = "8080";
@@ -45,9 +46,10 @@ namespace encausse.net {
     protected List<String> context = null;
     protected bool hasContext = false;
 
-    public WSRMacro(List<String> dir, double confidence, String server, String port, int loopback, List<string> context) {
+    public WSRMacro(List<String> dir, double confidence, double trigger, String server, String port, int loopback, List<string> context) {
 
       this.CONFIDENCE = confidence;
+      this.CONFIDENCE_TRIGGER = trigger;
       this.server = server;
       this.port = port;
       this.directories = dir;
@@ -412,15 +414,22 @@ namespace encausse.net {
 
     protected XPathNavigator HandleSpeech(RecognitionResult rr) {
       XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
-      double confidence = GetConfidence(xnav);
 
+      double confidence = GetConfidence(xnav);
       if (rr.Confidence < confidence) {
         log("ENGINE", "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Device: " + GetDeviceConfidence() + " Text: " + rr.Text);
         return null;
       }
 
-      log("ENGINE", "RECOGNIZED Speech: " + rr.Confidence + " Device: " + GetDeviceConfidence() + " Text: " + rr.Text);
+      if (rr.Words[0].Confidence < CONFIDENCE_TRIGGER) {
+        log("ENGINE", "REJECTED Trigger: " + rr.Words[0].Confidence + " Text: " + rr.Words[0].Text);
+        return null;
+      }
+
+      log("ENGINE", "RECOGNIZED Speech: " + rr.Confidence + "/" + rr.Words[0].Confidence + " Device: " + GetDeviceConfidence() + " Text: " + rr.Text);
       log(-1, "ENGINE", xnav.OuterXml);
+
+      if (WSRLaunch.DEBUG) { DumpAudio(rr); }
 
       return xnav;
     }
@@ -453,23 +462,12 @@ namespace encausse.net {
       // Wildcards
       int word = int.Parse(wildcard.Value);
 
-      /* == DUMP AUDIO STREAM TO FILE ==========================================
-       * http://msdn.microsoft.com/en-us/library/system.speech.recognition.recognitionresult.audio.aspx
-       */
-
       // Google
       using (MemoryStream audioStream = new MemoryStream()) {
         // rr.Audio.WriteToWaveStream(audioStream);
         rr.GetAudioForWordRange(rr.Words[word], rr.Words[word]).WriteToWaveStream(audioStream);
         audioStream.Position = 0;
         url += "&dictation="+ProcessAudioStream(audioStream);
-
-        /*
-        if (File.Exists("D:/dump_sarah.wav")){ File.Delete("D:/dump_sarah.wav"); }
-        using (FileStream fileStream = new FileStream("D:/dump_sarah.wav", FileMode.CreateNew)) {
-          rr.GetAudioForWordRange(rr.Words[word], rr.Words[word]).WriteToWaveStream(fileStream);
-        }
-        */
       }
       return url;
     }
@@ -616,23 +614,75 @@ namespace encausse.net {
     // ==========================================
 
     protected Boolean speaking = false;
+    protected SpeechSynthesizer synthesizer = null;
+
     public bool Speak(String tts) {
       
       if (tts == null) { return false; }
-      log("TTS", "Say: " + tts);
 
-      speaking = true;
-      using (SpeechSynthesizer synthesizer = new SpeechSynthesizer()) {
-
-        // Configure the audio output.
+      // Build synthesizer
+      if (synthesizer == null){
+        synthesizer = new SpeechSynthesizer();
         synthesizer.SetOutputToDefaultAudioDevice();
-
-        // Build and speak a prompt.
-        PromptBuilder builder = new PromptBuilder();
-        builder.AppendText(tts);
-        synthesizer.Speak(builder);
+        synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(synthesizer_SpeakCompleted);
       }
+
+      log("TTS", "Say: " + tts);
+      speaking = true;
+
+      // Build and speak a prompt.
+      PromptBuilder builder = new PromptBuilder();
+      builder.AppendText(tts);
+      synthesizer.SpeakAsync(builder);
+      
+      return true;
+    }
+
+    protected void synthesizer_SpeakCompleted (object sender, SpeakCompletedEventArgs e) {
       speaking = false;
+    }
+    
+
+    // ==========================================
+    //  WSRMacro DUMP AUDIO
+    // ==========================================
+    // http://msdn.microsoft.com/en-us/library/system.speech.recognition.recognitionresult.audio.aspx
+    
+    public bool DumpAudio (RecognitionResult rr) {
+      return DumpAudio(rr,null);
+    }
+    public bool DumpAudio(RecognitionResult rr, String path) {
+      
+      // Build Path
+      if (path == null){
+        path  = "dump/dump_";
+        path += DateTime.Now.ToString("yyyy.M.d_hh.mm.ss");
+        path += ".wav";
+      }
+
+      // Clean Path
+      if (File.Exists(path)){ File.Delete(path); }
+
+      // Dump to File
+      using (FileStream fileStream = new FileStream(path, FileMode.CreateNew)) {
+        rr.Audio.WriteToWaveStream(fileStream);
+      }
+
+      // Clean XML data
+      path += ".xml";
+      if (File.Exists(path)){ File.Delete(path); }
+
+      // Build XML
+      XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
+
+      String xml = "";
+      xml += "<match=\"" + rr.Confidence + "\" text\"" + rr.Text+"\">\r\n";
+      xml += "<trigger=\"" + rr.Words[0].Confidence + "\" text\"" + rr.Words[0].Text + "\">\r\n";
+      xml += xnav.OuterXml;
+
+      // Dump to XML
+      System.IO.File.WriteAllText(path, xml);
+
       return true;
     }
 

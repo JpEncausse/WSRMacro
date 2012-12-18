@@ -4,12 +4,9 @@
     <one-of>
       
       <!-- Greeting -->
-      <item>Bonjour  SARAH<tag>out.action._attributes.tts = "Bonjour"</tag></item>
-      <item>Aurevoir SARAH<tag>out.action._attributes.tts = "Aurevoir"</tag></item>
-      <item>
-        Bonjour JOCHUA
-        <tag>out.action._attributes.play = "medias/joshua.mp3"</tag>
-      </item>
+      <item>SARAH Bonjour  <tag>out.action._attributes.tts = "Bonjour"</tag></item>
+      <item>SARAH Aurevoir <tag>out.action._attributes.tts = "Aurevoir"</tag></item>
+      <item>JOCHUA Bonjour <tag>out.action._attributes.play = "medias/joshua.mp3"</tag></item>
       
       <item>
         SARAH J'ai une question 

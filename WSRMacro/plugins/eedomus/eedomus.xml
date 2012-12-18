@@ -9,7 +9,7 @@
     </one-of>
     <one-of>
       <item>la lampe du bureau<tag>out.action.periphId=12350</tag></item>
-      <item>la lampe du salon<tag>out.action.periphId=12350</tag></item>
+      <item>la lampe du salon<tag>out.action.periphId=14646</tag></item>
     </one-of>
     <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/eedomus";</tag>
   </rule>
