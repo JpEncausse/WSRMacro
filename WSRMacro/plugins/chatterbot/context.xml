@@ -10,7 +10,7 @@
       
       <item>
         SARAH J'ai une question 
-        <tag>out.action._attributes.context = "chatterbot.xml"</tag>
+        <tag>out.action._attributes.context = "lazyChatterbot.xml"</tag>
         <tag>out.action._attributes.tts = "Que veux tu ?"</tag>
       </item>
       

@@ -2,8 +2,6 @@
 using System.Globalization;
 using System.Text;
 using System.IO;
-using System.Speech.Recognition;
-using System.Speech.AudioFormat;
 using System.Collections;
 using System.Collections.Generic;
 using System.Xml.XPath;
@@ -12,7 +10,16 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Drawing;
 using System.Drawing.Imaging;
+
 using Microsoft.Kinect;
+/*
+using System.Speech.Recognition;
+using System.Speech.AudioFormat;
+*/
+using Microsoft.Speech.Recognition;
+using Microsoft.Speech.AudioFormat;
+
+
 using NHttp;
 using ZXing;
 using Fleck;

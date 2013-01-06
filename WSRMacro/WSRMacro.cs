@@ -1,16 +1,24 @@
 ﻿using System;
-using System.Speech;
-using System.Speech.Recognition;
-using System.Speech.Synthesis;
-using System.Speech.AudioFormat;
 using System.IO;
 using System.Xml.XPath;
 using System.Net;
-using System.Threading;
+using System.Threading; 
 using System.Text;
 using System.Web;
 using System.Globalization;
 using System.Collections.Generic;
+
+using System.Speech.Synthesis;
+/*
+using System.Speech;
+using System.Speech.Recognition;
+using System.Speech.AudioFormat;
+*/
+
+using Microsoft.Speech;
+using Microsoft.Speech.Recognition;
+using Microsoft.Speech.AudioFormat;
+
 using NHttp;
 using NAudio;
 using NAudio.Wave;
@@ -83,8 +91,7 @@ namespace encausse.net {
     //  WSRMacro GRAMMAR
     // ==========================================
 
-    protected DictationGrammar dictation = null;   // The dictation grammar
-    protected String DIR_PATH = null;             // FIXME: Resolved absolute path
+    protected String DIR_PATH = null;    // FIXME: Resolved absolute path
     protected bool reload = true;
 
     protected void LoadGrammar() {
@@ -115,11 +122,7 @@ namespace encausse.net {
       }
 
       // Add a Dictation Grammar
-      log("GRAMMAR", "Load dictation grammar");
-      dictation = new DictationGrammar("grammar:dictation");
-      dictation.Name = "dictation";
-      dictation.Enabled = false;
-      sre.LoadGrammar(dictation);
+      SetDictationGrammar(sre);
 
       // Start Watching
       StartDirectoryWatcher();
@@ -140,7 +143,7 @@ namespace encausse.net {
       foreach (DirectoryInfo d in dir.GetDirectories()) {
         LoadGrammar(d);
       }
-    }
+    } 
 
     public void LoadGrammar(String file, String name) {
 
@@ -148,7 +151,10 @@ namespace encausse.net {
 
       // Create a Grammar from file
       Grammar grammar = new Grammar(file);
-      grammar.Enabled = !grammar.RuleName.StartsWith("lazy");
+      grammar.Enabled = file.IndexOf("lazy") < 0;
+      if (grammar.RuleName != null) {
+        grammar.Enabled = !grammar.RuleName.StartsWith("lazy");
+      }
       grammar.Name = name;
 
       // Load the grammar object into the recognizer.
@@ -244,28 +250,6 @@ namespace encausse.net {
     // ==========================================
     //  WSRMacro ENGINE
     // ==========================================
-
-    /*
-    protected SpeechRecognitionEngine dictanizer = null;
-    public SpeechRecognitionEngine GetDictationEngine() {
-      if (dictanizer != null) {
-        return dictanizer;
-      }
-
-      log("ENGINE", "Init recognizer");
-      dictanizer = new SpeechRecognitionEngine(new System.Globalization.CultureInfo("fr-FR"));
-
-      // Set recognizer properties
-      SetupProperties(dictanizer);
-
-      // Load a Dictation grammar
-      DictationGrammar d = new DictationGrammar("grammar:dictation");
-      d.Name = "dictation";
-      dictanizer.LoadGrammar(d);
-
-      return dictanizer;
-    }
-    */
 
     protected SpeechRecognitionEngine recognizer = null;
     public virtual void StartRecognizer() {
@@ -369,7 +353,7 @@ namespace encausse.net {
       }
 
       // 1. Handle dictation mode
-      if (this.dictation.Enabled && HandleDictation(rr, CONFIDENCE_DICTATION)) {
+      if (this.dictation != null && this.dictation.Enabled && HandleDictation(rr, CONFIDENCE_DICTATION)) {
         this.dictation.Enabled = false;
         return;
       }
@@ -445,7 +429,27 @@ namespace encausse.net {
       }
     }
 
+    // ==========================================
+    //  WSRMacro DICTATION
+    //  Only for Windows.Speech not Microsoft.Speech
+    // ==========================================
+
+    protected Grammar dictation = null;  // The dictation grammar
+
+    // Not for Microsoft.Speech
+    protected void SetDictationGrammar (SpeechRecognitionEngine sre) {
+      /*
+      log("GRAMMAR", "Load dictation grammar");
+      dictation = new DictationGrammar("grammar:dictation");
+      dictation.Name = "dictation";
+      dictation.Enabled = false;
+      sre.LoadGrammar(dictation);
+      */
+    }
+    
+    
     protected String HandleWildcard(RecognitionResult rr, String url) {
+      /*
       XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
       XPathNavigator wildcard = xnav.SelectSingleNode("/SML/action/@dictation");
       if (wildcard == null) { return url; }
@@ -469,8 +473,31 @@ namespace encausse.net {
         audioStream.Position = 0;
         url += "&dictation="+ProcessAudioStream(audioStream);
       }
+      */
       return url;
     }
+    
+    /*
+    protected SpeechRecognitionEngine dictanizer = null;
+    public SpeechRecognitionEngine GetDictationEngine() {
+      if (dictanizer != null) {
+        return dictanizer;
+      }
+
+      log("ENGINE", "Init recognizer");
+      dictanizer = new SpeechRecognitionEngine(new System.Globalization.CultureInfo("fr-FR"));
+
+      // Set recognizer properties
+      SetupProperties(dictanizer);
+
+      // Load a Dictation grammar
+      DictationGrammar d = new DictationGrammar("grammar:dictation");
+      d.Name = "dictation";
+      dictanizer.LoadGrammar(d);
+
+      return dictanizer;
+    }
+    */
 
     // ==========================================
     //  WSRMacro HTTP

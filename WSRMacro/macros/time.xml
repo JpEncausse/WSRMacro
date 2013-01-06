@@ -1,4 +1,4 @@
-<grammar version="1.0" xml:lang="fr-FR" mode="voice" root="ruleTime" xmlns="http://www.w3.org/2001/06/grammar" tag-format="semantics/1.0">
+<grammar version="1.0" xml:lang="fr-FR" mode="voice"  root="ruleTime" xmlns="http://www.w3.org/2001/06/grammar" tag-format="semantics/1.0">
   <rule id="ruleTime" scope="public">
     <example>Sarah il est quelle heure ?</example>
     <tag>out.action=new Object(); </tag>

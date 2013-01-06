@@ -75,9 +75,7 @@ namespace encausse.net {
     }
 
     static void ShowHelp(OptionSet p) {
-      Console.WriteLine("Usage: greet [OPTIONS]+ message");
-      Console.WriteLine("Greet a list of individuals with an optional message.");
-      Console.WriteLine("If no message is specified, a generic greeting is used.");
+      Console.WriteLine("Usage: WSRLaunch [OPTIONS]+ message");
       Console.WriteLine();
       Console.WriteLine("Options:");
       p.WriteOptionDescriptions(Console.Out);
