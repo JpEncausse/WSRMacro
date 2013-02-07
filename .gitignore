@@ -18,6 +18,7 @@ local.properties
 packages/
 WSRMacro/dump
 WSRMacro/medias/Kinect*
+WSRMacro/Camera/TrainedFaces
 
 # External tool builders
 .externalToolBuilders/

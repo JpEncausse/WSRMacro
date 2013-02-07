@@ -1,0 +1,13 @@
+﻿<grammar version="1.0" xml:lang="fr-FR" mode="voice" root="ruleFace" xmlns="http://www.w3.org/2001/06/grammar" tag-format="semantics/1.0">
+  <rule id="ruleFace" scope="public">
+    <example>Sarah demarre la reconnaissance gestuelle</example>
+    <tag>out.action=new Object(); </tag>
+    <item weight="2">Sarah</item>
+    <one-of>
+      <item>démarre<tag>out.action.reco = "start";</tag></item>
+      <item>arrête<tag>out.action.reco = "stop";</tag></item>
+    </one-of>
+    <item>la reconnaissance gestuelle</item>
+    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/gesture";</tag>
+  </rule>
+</grammar>

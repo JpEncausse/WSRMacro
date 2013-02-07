@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Xml;
 using Microsoft.Kinect;
 
-namespace encausse.net {
+namespace net.encausse.sarah {
 
   // ==========================================
   //  ENUMEATIONS
@@ -34,9 +34,9 @@ namespace encausse.net {
     private readonly String description;
     private int maxExecutionTime = 0;
 
-    // ------------------------------------------
+    // ==========================================
     //  Constructor
-    // ------------------------------------------
+    // ==========================================
  
     public Gesture() {
       id = Guid.NewGuid();
@@ -204,7 +204,7 @@ namespace encausse.net {
       // Check each component of the gesture
       foreach (var component in ComponentStates) {
         if (component.Evaluate(sd)) {
-          WSRLaunch.log(-1, "GESTURE", "Gesture Component: " + gesture.Description);
+          WSRConfig.GetInstance().logDebug("GESTURE", "Gesture Component: " + gesture.Description);
         }
       }
 
@@ -218,8 +218,8 @@ namespace encausse.net {
       }
 
       if (completeCount >= ComponentStates.Count && IsExecuting) {
-        WSRLaunch.log(-1, "GESTURE", "Gesture complete: " + gesture.Description);
-        WSRLaunch.log(-1, "GESTURE", ">>>> RESET <<<<");
+        WSRConfig.GetInstance().logDebug("GESTURE", "Gesture complete: " + gesture.Description);
+        WSRConfig.GetInstance().logDebug("GESTURE", ">>>> RESET <<<<");
         Reset();
         return true;
       }
@@ -227,7 +227,7 @@ namespace encausse.net {
       // Some components match
       if (inflightCount >= ComponentStates.Count) {
         if (!IsExecuting) {
-          WSRLaunch.log(-1, "GESTURE", "Has Transitioned To In Flight State: " + gesture.Description);
+          WSRConfig.GetInstance().logDebug("GESTURE", "Has Transitioned To In Flight State: " + gesture.Description);
           IsExecuting = true;
           beginExecutionTime = DateTime.Now;
           return false;
@@ -360,13 +360,31 @@ namespace encausse.net {
     public List<Gesture> gestures = new List<Gesture>();
     private Dictionary<int, GestureStateUser> userMap = new Dictionary<int, GestureStateUser>();
 
-
-    public GestureManager(WSRKinectMacro macro) { 
-      this.wsrmacro = macro;
+    private WSRKinectMacro wsr;
+    private WSRConfig config;
+    public GestureManager(WSRKinectMacro wsr) {
+      this.wsr = wsr;
+      this.config = WSRConfig.GetInstance(); // Convenient
     }
-    private WSRKinectMacro wsrmacro = null;
-    private void callback(Gesture gesture) {
-      wsrmacro.HandleGestureComplete(gesture);
+
+    bool started = false;
+    public void Recognize(bool start) {
+      if (start && !started) {
+        ((WSRKinectMacro)WSRMacro.GetInstance()).Sensor.SkeletonFrameReady += SensorSkeletonFrameReady;
+        started = true;
+      }
+      else if (!start && started) {
+        ((WSRKinectMacro)WSRMacro.GetInstance()).Sensor.SkeletonFrameReady -= SensorSkeletonFrameReady;
+        started = false;
+      }
+    }
+
+    // ------------------------------------------
+    //  Event
+    // ------------------------------------------
+
+    private void fireGesture(Gesture gesture) {
+      wsr.HandleGestureComplete(gesture);
     }
 
     // ------------------------------------------
@@ -374,12 +392,12 @@ namespace encausse.net {
     // ------------------------------------------
 
     public void LoadGesture(String file, String name) {
-      WSRLaunch.log("GESTURE", "Load file: " + name + " : " + file);
+      config.logInfo("GESTURE", "Load file: " + name + " : " + file);
       Load(file);
     }
 
     public void LoadGestures(DirectoryInfo dir) {
-      WSRLaunch.log("GESTURE", "Load directory: " + dir.FullName);
+      config.logInfo("GESTURE", "Load directory: " + dir.FullName);
 
       // Load Grammar
       foreach (FileInfo f in dir.GetFiles("*.gesture")) {
@@ -405,12 +423,12 @@ namespace encausse.net {
             if (reader.Name == "gesture") {
               gesture = Gesture.Parse(reader);
               gestures.Add(gesture);
-              WSRLaunch.log("GESTURE", "Loading: " + gesture.Description);
+              config.logInfo("GESTURE", "Loading: " + gesture.Description);
             }
             if (reader.Name == "component" && gesture != null) {
               GestureComponent component = GestureComponent.Parse(reader);
               gesture.Components.Add(component);
-              WSRLaunch.log("GESTURE", "Component: " + component.Log(gesture.Description));
+              config.logInfo("GESTURE", "Component: " + component.Log(gesture.Description));
             }
             break;
         }
@@ -445,11 +463,11 @@ namespace encausse.net {
             userMap.Add(sd.TrackingId, user);
           }
 
-          WSRLaunch.log(-2, "GESTURE", "Skeleton " + sd.Position.X + "," + sd.Position.Y + "," + sd.Position.Z);
+          config.logDebug("GESTURE", "Skeleton " + sd.Position.X + "," + sd.Position.Y + "," + sd.Position.Z);
           Gesture gesture = userMap[sd.TrackingId].Evaluate(sd);
           if (gesture != null) {
-            WSRLaunch.log("GESTURE", "Active User Gesture complete: " + gesture.Description);
-            callback(gesture);
+            config.logInfo("GESTURE", "Active User Gesture complete: " + gesture.Description);
+            fireGesture(gesture);
             userMap[sd.TrackingId].ResetAll(sd);
           }
 

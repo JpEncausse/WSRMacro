@@ -6,13 +6,29 @@
     <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{ADD1F306-0CB8-4D58-A06E-DD2FA7F16A8B}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>WSRMacro</RootNamespace>
+    <RootNamespace>net.encausse.sarah</RootNamespace>
     <AssemblyName>WSRMacro</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
     <FileAlignment>512</FileAlignment>
+    <PublishUrl>publier\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
     <PlatformTarget>x86</PlatformTarget>
@@ -35,20 +51,45 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup>
-    <StartupObject>encausse.net.WSRLaunch</StartupObject>
+    <StartupObject>net.encausse.sarah.WSRMain</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="CodeBits\IniFile.cs" />
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="WSRCamera.xaml.cs">
+      <DependentUpon>WSRCamera.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="WSRConfig.cs" />
+    <Compile Include="WSRCtxMenu.cs" />
+    <Compile Include="WSRFaceRecognition.cs" />
     <Compile Include="WSRGesture.cs" />
+    <Compile Include="WSRHttpManager.cs" />
+    <Compile Include="WSRKeyboard.cs" />
     <Compile Include="WSRKinectMacro.cs" />
-    <Compile Include="WSRLaunch.cs" />
+    <Compile Include="WSRMain.cs" />
     <Compile Include="WSRMacro.cs" />
+    <Compile Include="WSRQRCode.cs" />
+    <Compile Include="WSRSpeaker.cs" />
+    <Compile Include="WSRTrayMenu.cs" />
+    <Compile Include="WSRWebSocket.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Camera\haarcascade_frontalface_alt_tree.xml" />
     <Content Include="plugins\calendar\calendar.xml" />
     <Content Include="plugins\chatterbot\lazyChatterbot.xml" />
     <Content Include="plugins\chatterbot\context.xml" />
     <Content Include="plugins\dictionary\dictionary.xml" />
     <Content Include="plugins\eedomus\eedomus.xml" />
+    <Content Include="plugins\face\face.xml">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="plugins\gesture\gesture.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="plugins\karotz\karotz.xml" />
     <Content Include="plugins\kinect\kinect.xml" />
     <Content Include="plugins\meteo\meteo.xml" />
@@ -62,6 +103,12 @@
     <Content Include="macros\time.xml">
       <SubType>Designer</SubType>
     </Content>
+    <Content Include="Resources\exit.png" />
+    <Content Include="Resources\Home.ico" />
+    <Content Include="Resources\kinect.png" />
+    <Content Include="Resources\logs.png" />
+    <None Include="app.config" />
+    <None Include="custom.ini" />
     <None Include="packages.config" />
     <None Include="plugins\calendar\fr-FR.grxml" />
     <None Include="plugins\eedomus\eedomus.gbkp" />
@@ -82,8 +129,26 @@
     <Reference Include="CUETools.Codecs.FLAKE">
       <HintPath>dll\CUETools.Codecs.FLAKE.dll</HintPath>
     </Reference>
+    <Reference Include="Emgu.CV">
+      <HintPath>dll\Emgu.CV.dll</HintPath>
+    </Reference>
+    <Reference Include="Emgu.CV.GPU">
+      <HintPath>dll\Emgu.CV.GPU.dll</HintPath>
+    </Reference>
+    <Reference Include="Emgu.CV.ML">
+      <HintPath>dll\Emgu.CV.ML.dll</HintPath>
+    </Reference>
+    <Reference Include="Emgu.CV.UI">
+      <HintPath>dll\Emgu.CV.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="Emgu.Util">
+      <HintPath>dll\Emgu.Util.dll</HintPath>
+    </Reference>
     <Reference Include="Fleck">
       <HintPath>..\packages\Fleck.0.9.6.14\lib\net40\Fleck.dll</HintPath>
+    </Reference>
+    <Reference Include="InputSimulator">
+      <HintPath>dll\InputSimulator.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Kinect, Version=1.5.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -103,14 +168,24 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\NHttp.0.1.4.0\lib\net20\NHttp.dll</HintPath>
     </Reference>
+    <Reference Include="NLog">
+      <HintPath>..\packages\NLog.2.0.0.2000\lib\net40\NLog.dll</HintPath>
+    </Reference>
     <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
     <Reference Include="System" />
+    <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Net" />
     <Reference Include="System.Speech" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml" />
     <Reference Include="System.XML" />
     <Reference Include="WindowsBase" />
+    <Reference Include="WriteableBitmapEx.Wpf">
+      <HintPath>..\packages\WriteableBitmapEx.1.0.6.0\lib\net40\WriteableBitmapEx.Wpf.dll</HintPath>
+    </Reference>
     <Reference Include="zxing, Version=0.9.0.0, Culture=neutral, PublicKeyToken=4e88037ac681fe60, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\ZXing.Net.0.9.0.0\lib\net40\zxing.dll</HintPath>
@@ -122,6 +197,40 @@
   <ItemGroup>
     <Folder Include="medias\" />
     <Folder Include="plugins\mail\" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include=".NETFramework,Version=v4.0,Profile=Client">
+      <Visible>False</Visible>
+      <ProductName>Microsoft .NET Framework 4 Client Profile %28x86 et x64%29</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1 Client Profile</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Windows.Installer.4.5">
+      <Visible>False</Visible>
+      <ProductName>Windows Installer 4.5</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <Page Include="WSRCamera.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

@@ -10,70 +10,102 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Drawing;
 using System.Drawing.Imaging;
-
+using System.Windows.Forms;
 using Microsoft.Kinect;
+
 /*
 using System.Speech.Recognition;
 using System.Speech.AudioFormat;
 */
+
 using Microsoft.Speech.Recognition;
 using Microsoft.Speech.AudioFormat;
 
 
-using NHttp;
-using ZXing;
-using Fleck;
-using System.Drawing.Drawing2D;
+namespace net.encausse.sarah {
 
-namespace encausse.net {
+  public class WSRKinectMacro : WSRMacro {
 
-  public class WSRKinectMacro : WSRMacro{
-    
+    new public static WSRMacro GetInstance() {
+      if (manager == null) {
+        manager = new WSRKinectMacro();
+        manager.Init();
+      }
+      return manager;
+    }
+
     // ==========================================
     //  WSRMacro CONSTRUCTOR
     // ==========================================
 
-    public WSRKinectMacro (List<String> dir, double confidence, double trigger, String server, String port, int loopback, List<string> context, bool gesture, bool picture, int websocket)
-      : base(dir, confidence, trigger, server, port, loopback, context) {
-      this.gesture = gesture;
-      this.picture = picture;
-      this.wckport = websocket;
-
+    public override void Init() {
+      base.Init();
       SetupSensor();
-      SetupWebSocket();
+    }
+
+    public override void Dispose() {
+      
+      // Stop Thread
+      WSRCamera.Shutdown();
+
+      // Stop Sensor
+      logInfo("KINECT", "Stop sensor");
+      if (Sensor != null) {  Sensor.Stop(); }
+
+      // Stop super
+      base.Dispose();
+    }
+
+    // ==========================================
+    //  WSRMacro SYSTEM TRAY
+    // ==========================================
+
+    public override void HandleCtxMenu(ContextMenuStrip menu) {
+      
+      var item = new ToolStripMenuItem();
+      item.Text = "Kinect";
+      item.Click += new EventHandler(Kinect_Click);
+      item.Image = net.encausse.sarah.Properties.Resources.Kinect;
+      menu.Items.Add(item); 
+
+      // Super
+      base.HandleCtxMenu(menu);
+    }
+
+    void Kinect_Click(object sender, EventArgs e) {
+      WSRCamera.Display();
     }
 
     // ==========================================
     //  KINECT GESTURE
     // ==========================================
-
-    bool gesture = false;
+    GestureManager gestureMgr = null;
     public void SetupSkeletonFrame(KinectSensor sensor) {
-      if (!gesture) {
+
+      if (!WSRConfig.GetInstance().IsGestureMode()) {
         return;
       }
+
       // Build Gesture Manager
-      GestureManager mgr = new GestureManager(this);
+      gestureMgr = new GestureManager(this);
 
       // Load Gestures from directories
-      foreach (string directory in this.directories) {
+      foreach (string directory in WSRConfig.GetInstance().directories) {
         DirectoryInfo d = new DirectoryInfo(directory);
-        mgr.LoadGestures(d);
+        gestureMgr.LoadGestures(d);
       }
 
       // Plugin in Kinect Sensor
-      log("KINECT", "Starting Skeleton sensor");
+      logInfo("KINECT", "Starting Skeleton sensor");
       sensor.SkeletonStream.Enable();
-      sensor.SkeletonFrameReady += mgr.SensorSkeletonFrameReady;
-
     }
 
     public void HandleGestureComplete(Gesture gesture) {
-      SendRequest(CleanURL(gesture.Url));
+      WSRHttpManager.GetInstance().SendRequest(gesture.Url);
     }
 
     // ==========================================
-    //  WSRMacro RECOGNIZE
+    //  WSRMacro SPEECH RECOGNITION
     // ==========================================
 
     protected override String HandleCustomAttributes(XPathNavigator xnav) {
@@ -98,13 +130,13 @@ namespace encausse.net {
     //  WSRMacro REQUEST
     // ==========================================
 
-    protected override bool HandleCustomRequest(HttpRequestEventArgs e) {
+    public override bool HandleCustomRequest(NHttp.HttpRequestEventArgs e) {
 
       if (base.HandleCustomRequest(e)) {
         return true;
       }
 
-      // 3.3 Parse Result's Photo
+      // Parse Result's Photo
       if (e.Request.Params.Get("picture") != null) {
         String path = TakePicture("medias/");
         using (var writer = new StreamWriter(e.Response.OutputStream)) {
@@ -115,62 +147,179 @@ namespace encausse.net {
         return true;
       }
 
+      // Face recognition
+      String facereco = e.Request.Params.Get("face");
+      if (facereco != null) {
+        facereco = e.Server.HtmlDecode(facereco);
+        if ("start".Equals(facereco)) {
+          WSRCamera.Recognize(true);
+        }
+        else if ("stop".Equals(facereco)) {
+          WSRCamera.Recognize(false);
+        }
+        else if ("train".Equals(facereco)) {
+          WSRCamera.Train();
+        }
+      }
+
+      // Gesture recognition
+      String gesture = e.Request.Params.Get("gesture");
+      if (gesture != null && gestureMgr != null) {
+        gesture = e.Server.HtmlDecode(gesture);
+        if ("start".Equals(gesture)) {
+          gestureMgr.Recognize(true);
+        }
+        else if ("stop".Equals(gesture)) {
+          gestureMgr.Recognize(false);
+        }
+      }
+
       return false;
     } 
 
     // ==========================================
     //  KINECT COLOR FRAME
     // ==========================================
-    protected bool picture = false;
-    protected byte[] colorPixels;
-    protected int colorW = 1280;
-    protected int colorH = 960;
+
+    private byte[] ColorPixels;
+    private int ColorW;
+    private int ColorH;
 
     public void SetupColorFrame(KinectSensor sensor) {
-      log("KINECT", "Starting Color sensor");
-      if (!picture) {
-        return;
-      }
+
+      if (!WSRConfig.GetInstance().IsPictureMode()) { return; }
+      logInfo("KINECT", "Starting Color sensor");
 
       // Turn on the color stream to receive color frames
-      sensor.ColorStream.Enable(ColorImageFormat.RgbResolution1280x960Fps12);
-      // sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
+      // sensor.ColorStream.Enable(ColorImageFormat.RgbResolution1280x960Fps12);
+      sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
 
-      colorW = sensor.ColorStream.FrameWidth;
-      colorH = sensor.ColorStream.FrameHeight;
+      ColorW = sensor.ColorStream.FrameWidth;
+      ColorH = sensor.ColorStream.FrameHeight;
 
       // Allocate space to put the pixels we'll receive
-      colorPixels = new byte[sensor.ColorStream.FramePixelDataLength];
+      ColorPixels = new byte[sensor.ColorStream.FramePixelDataLength];
 
-      // Add an event handler to be called whenever there is new color frame data
+      // Init Common ----------
       sensor.ColorFrameReady += new EventHandler<ColorImageFrameReadyEventArgs>(handle_ColorFrameReady);
+
+      // Init QRCode ----------
+      QRCodeManager qrmgr = new QRCodeManager(this);
+      sensor.ColorFrameReady += qrmgr.SensorColorFrameReady;
+
+      // Init WebSocket ----------
+      WebSocketManager wsmgr = new WebSocketManager(this);
+      if (wsmgr.SetupWebSocket()) {
+        sensor.ColorFrameReady += wsmgr.SensorColorFrameReady;
+      }
+
+      // Init WSRCamera ----------
+      WSRCamera.Start();
     }
 
     protected void handle_ColorFrameReady(object sender, ColorImageFrameReadyEventArgs e) {
 
-      using (ColorImageFrame colorFrame = e.OpenColorImageFrame()) {
-        if (colorFrame == null) {
-          return;
-        }
+      using (ColorImageFrame frame = e.OpenColorImageFrame()) {
+        if (frame == null) { return; }
 
         // Copy the pixel data from the image to a temporary array
-        colorFrame.CopyPixelDataTo(colorPixels);
+        frame.CopyPixelDataTo(ColorPixels);
       }
 
-      DecodeQRCode();
+      // Remove transparency
+      for (int i = 3; i < ColorPixels.Length; i += 4) { ColorPixels[i] = 255; }
     }
 
-    private Bitmap getBitmap() {
-      WriteableBitmap colorBitmap = new WriteableBitmap(colorW, colorH, 96.0, 96.0, PixelFormats.Bgr32, null);
-      colorBitmap.WritePixels(
-            new Int32Rect(0, 0, colorBitmap.PixelWidth, colorBitmap.PixelHeight),
-            colorPixels, colorBitmap.PixelWidth * sizeof(int), 0);
+
+    // ==========================================
+    //  KINECT QRCODE
+    // ==========================================
+
+    public bool HandleQRCodeComplete(String match) {
+
+      // Play sound effect for feedback
+      WSRSpeaker.GetInstance().PlayMP3("medias/qrcode.mp3");
+
+      if (match.StartsWith("http")) {
+        WSRHttpManager.GetInstance().SendRequest(match);
+      }
+      else {
+        WSRSpeaker.GetInstance().Speak(match);
+      }
+      return true;
+    }
+
+    // ==========================================
+    //  KINECT PICTURE
+    // ==========================================
+
+    private WriteableBitmap colorBitmap;
+    private String TakePicture(string folder) {
+
+      if (null == Sensor || null == folder) {
+        return null;
+      }
+
+      if (null == colorBitmap) {
+        colorBitmap = NewColorBitmap();
+      }
+
+      Bitmap image = GetColorPNG(colorBitmap);
+      BitmapEncoder encoder = new JpegBitmapEncoder();
+      String time = System.DateTime.Now.ToString("hh'-'mm'-'ss", CultureInfo.CurrentUICulture.DateTimeFormat);
+      String path = folder+"KinectSnapshot-" + time + ".jpg";
+      using (FileStream fs = new FileStream(path, FileMode.Create)) {
+        image.Save(fs, ImageFormat.Jpeg);
+     // image.Save(fs, encoder);
+      }
+      image.Dispose();
+
+      logInfo("PICTURE", "New picture to: " + path);
+      return path;
+    }
+
+    // ==========================================
+    //  KINECT FACE RECOGNITION
+    // ==========================================
+
+    DateTime lastFaceRecognition = DateTime.Now;
+    public void HandleFaceComplete(List<String> matches) {
+
+      // Throttle
+      var delta = DateTime.Now - lastFaceRecognition;
+      if (delta.TotalMilliseconds < 1000 * 5){ return; }
+      lastFaceRecognition = DateTime.Now;
+
+      // Send HTTP Request
+      var qs = string.Join("&id=", matches.ToArray());
+      WSRHttpManager.GetInstance().SendRequest("http://127.0.0.1:8080/sarah/face?id=" + qs);
+
+      return;
+    }
+
+    // ==========================================
+    //  COLOR BITMAP - UTIL
+    // ==========================================
+
+    public WriteableBitmap NewColorBitmap() {
+      return new WriteableBitmap(ColorW, ColorH, 96.0, 96.0, PixelFormats.Bgra32, null);
+    }
+
+    public void UpdateColorBitmap(WriteableBitmap bitmap) {
+      var rect = new Int32Rect(0, 0, bitmap.PixelWidth, bitmap.PixelHeight);
+      bitmap.WritePixels(rect, ColorPixels, bitmap.PixelWidth * PixelFormats.Bgra32.BitsPerPixel / 8, 0);
+    }
+
+    public Bitmap GetColorPNG(WriteableBitmap bitmap) {
+
+      // Update ColorBitmap
+      UpdateColorBitmap(bitmap);
 
       // Create a png bitmap encoder which knows how to save a .png file
       BitmapEncoder encoder = new PngBitmapEncoder();
 
       // Create frame from the writable bitmap and add to encoder
-      encoder.Frames.Add(BitmapFrame.Create(colorBitmap));
+      encoder.Frames.Add(BitmapFrame.Create(bitmap));
 
       Bitmap image = null;
       using (MemoryStream ms = new MemoryStream()) {
@@ -183,153 +332,27 @@ namespace encausse.net {
     }
 
     // ==========================================
-    //  KINECT WEBSOCKET
-    // ==========================================
-
-    protected int wckport = -1;
-    protected WebSocketServer websocket = null;
-    List<IWebSocketConnection> sockets = new List<IWebSocketConnection>();
-    
-    protected void SetupWebSocket() {
-      if (!picture || wckport < 0) {
-        return;
-      }
-      websocket = new WebSocketServer("ws://localhost:" + wckport);
-      websocket.Start(socket => {
-        socket.OnOpen = () => {
-          log("WEBSCK", "Connected to: " + socket.ConnectionInfo.ClientIpAddress);
-          sockets.Add(socket);
-        };
-        socket.OnClose = () => {
-          log("WEBSCK", "Disconnected from: " + socket.ConnectionInfo.ClientIpAddress);
-          sockets.Remove(socket);
-        };
-        socket.OnMessage = message => {
-          // log("WEBSCK", "Message: " + message);
-          SendWebSocket(colorPixels);
-        };
-      });
-    }
-
-    protected void SendWebSocket(byte[] message) {
-      if (websocket == null) {
-        return;
-      }
-
-      Bitmap image = getBitmap();
-      /*
-      Bitmap result = new Bitmap( 640, 480 );
-      using (Graphics g = Graphics.FromImage((Image)result)) {
-        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        g.DrawImage(image, 0, 0, 640, 480);
-      }
-      image.Dispose();
-      */
-
-      MemoryStream ms = new MemoryStream();
-      image.Save(ms, ImageFormat.Jpeg);
-      image.Dispose();
-
-      byte[] imgByte = ms.ToArray();
-      string base64String = Convert.ToBase64String(imgByte);
-      SendWebSocket(base64String);
-    }
-
-    protected void SendWebSocket(string message) {
-      if (websocket == null) {
-        return;
-      }
-
-      foreach (var socket in sockets) {
-        socket.Send(message);
-      }
-    }
-
-    // ==========================================
-    //  KINECT PICTURE
-    // ==========================================
-
-
-    private String TakePicture(string folder) {
-
-      if (sensor == null || folder == null) {
-        return null;
-      }
-
-      Bitmap image = getBitmap();
-      BitmapEncoder encoder = new JpegBitmapEncoder();
-      String time = System.DateTime.Now.ToString("hh'-'mm'-'ss", CultureInfo.CurrentUICulture.DateTimeFormat);
-      String path = folder+"KinectSnapshot-" + time + ".jpg";
-      using (FileStream fs = new FileStream(path, FileMode.Create)) {
-        image.Save(fs, ImageFormat.Jpeg);
-      //image.Save(fs, encoder);
-      }
-      image.Dispose();
-
-      log("PICTURE", "New picture to: " + path);
-      return path;
-    }
-
-    // ==========================================
-    //  KINECT QRCODE
-    // ==========================================
-
-    int threashold = 0;
-    private bool DecodeQRCode() {
-
-      if (sensor == null && threashold++ < 48) {
-        return false;
-      }
-      threashold = 0;
-
-      Bitmap image = getBitmap();
-      BarcodeReader reader = new BarcodeReader { AutoRotate = true, TryHarder = true , PossibleFormats = new List<BarcodeFormat> { BarcodeFormat.QR_CODE } };
-      Result result = reader.Decode(image);
-      image.Dispose();
-
-      if (result == null) {
-        return false;
-      }
-
-      // Play sound effect for feedback
-      PlayMP3("medias/qrcode.mp3");
-
-      // Do something with the result
-      String type = result.BarcodeFormat.ToString();
-      String content = result.Text;
-
-      log("QRCODE", "Type: " + type + " Content: " + content);
-      if (content.StartsWith("http")) {
-        SendRequest(content);
-      }
-      else {
-        Speak(content);
-      }
-      return true;
-    }
-
-    // ==========================================
     //  KINECT AUDIO
     // ==========================================
 
     public override Boolean SetupDevice(SpeechRecognitionEngine sre) {
 
       // Abort if there is no sensor available
-      if (null == sensor) {
-        log("KINECT", "No Kinect Sensor");
+      if (null == Sensor) {
+        logInfo("KINECT", "No Kinect Sensor");
         return false;
       }
 
-      SetupAudioSource(sensor, sre);
+      SetupAudioSource(Sensor, sre);
 
-      log("KINECT", "Using Kinect Sensors !"); 
+      logInfo("KINECT", "Using Kinect Sensors !"); 
       return true;
     }
 
 
     protected Boolean SetupAudioSource(KinectSensor sensor, SpeechRecognitionEngine sre) {
       if (!sensor.IsRunning) {
-        log("KINECT", "Sensor is not running"); 
+        logInfo("KINECT", "Sensor is not running"); 
         return false;
       }
       
@@ -339,21 +362,21 @@ namespace encausse.net {
       source.NoiseSuppression = true;
       source.BeamAngleMode = BeamAngleMode.Adaptive; //set the beam to adapt to the surrounding
 
-      log(0, "KINECT", "AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
-      log(0, "KINECT", "BeamAngle : " + source.BeamAngle);
-      log(0, "KINECT", "EchoCancellationMode : " + source.EchoCancellationMode);
-      log(0, "KINECT", "EchoCancellationSpeakerIndex : " + source.EchoCancellationSpeakerIndex);
-      log(0, "KINECT", "NoiseSuppression : " + source.NoiseSuppression);
-      log(0, "KINECT", "SoundSourceAngle : " + source.SoundSourceAngle);
-      log(0, "KINECT", "SoundSourceAngleConfidence : " + source.SoundSourceAngleConfidence);
+      WSRConfig.GetInstance().logDebug("KINECT", "AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
+      WSRConfig.GetInstance().logDebug("KINECT", "BeamAngle : " + source.BeamAngle);
+      WSRConfig.GetInstance().logDebug("KINECT", "EchoCancellationMode : " + source.EchoCancellationMode);
+      WSRConfig.GetInstance().logDebug("KINECT", "EchoCancellationSpeakerIndex : " + source.EchoCancellationSpeakerIndex);
+      WSRConfig.GetInstance().logDebug("KINECT", "NoiseSuppression : " + source.NoiseSuppression);
+      WSRConfig.GetInstance().logDebug("KINECT", "SoundSourceAngle : " + source.SoundSourceAngle);
+      WSRConfig.GetInstance().logDebug("KINECT", "SoundSourceAngleConfidence : " + source.SoundSourceAngleConfidence);
 
       sre.SetInputToAudioStream(source.Start(), new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
       return true;
     }
 
     protected override String GetDeviceConfidence() {
-      if (sensor == null) { return ""; }
-      KinectAudioSource source = sensor.AudioSource;
+      if (null == Sensor) { return ""; }
+      KinectAudioSource source = Sensor.AudioSource;
       if (source == null) { return ""; }
       return "BeamAngle : " + source.BeamAngle + " "
            + "SourceAngle : " + source.SoundSourceAngle + " "
@@ -364,49 +387,50 @@ namespace encausse.net {
     //  KINECT STATRT/STOP
     // ==========================================
 
-    protected KinectSensor sensor = null;
+    public KinectSensor Sensor { get; set; }
     protected void SetupSensor() {
       // Looking for a valid sensor 
       foreach (var potentialSensor in KinectSensor.KinectSensors) {
         if (potentialSensor.Status == KinectStatus.Connected) {
-          sensor = potentialSensor;
+          Sensor = potentialSensor;
           break;
         }
       }
 
       // Abort if there is no sensor available
-      if (null == sensor) {
-        log("KINECT", "No Kinect Sensor");
+      if (null == Sensor) {
+        logInfo("KINECT", "No Kinect Sensor");
         return;
       }
 
       // Use Skeleton Engine
-      SetupSkeletonFrame(sensor);
+      SetupSkeletonFrame(Sensor);
 
       // Use Color Engine
-      SetupColorFrame(sensor);
+      SetupColorFrame(Sensor);
 
       // Starting the sensor                   
-      try { sensor.Start(); }
-      catch (IOException) { sensor = null; return; } // Some other application is streaming from the same Kinect sensor
+      try { Sensor.Start(); }
+      catch (IOException) { Sensor = null; return; } // Some other application is streaming from the same Kinect sensor
     }
+
     /*
     public override void StopRecognizer() { 
       base.StopRecognizer();
-      log("KINECT", "Stop sensor"); 
-      if (sensor != null) {
-        sensor.Stop();
+      logInfo("KINECT", "Stop sensor"); 
+      if (Sensor != null) {
+        Sensor.Stop();
       }
-      log("KINECT", "Stop sensor...done");
+      logInfo("KINECT", "Stop sensor...done");
     }
-
+    
     public override void StartRecognizer() {
-      log("KINECT", "Start sensor"); 
+      logInfo("KINECT", "Start sensor"); 
       if (sensor != null) {
         sensor.Start();
         SetupAudioSource(sensor, GetEngine()); 
       }
-      log("KINECT", "Start sensor...done");
+      logInfo("KINECT", "Start sensor...done");
       base.StartRecognizer();
     }
     */

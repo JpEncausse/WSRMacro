@@ -8,7 +8,7 @@
     <ruleref special="GARBAGE" />
     <item>wikipedia</item>
     
-    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/phantom/dictionary";</tag>
-    <tag>out.action._attributes.dictation="2";</tag>
+    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/dictionary";</tag>
+    <tag>out.action._attributes.dictation="true";</tag>
   </rule>
 </grammar>
