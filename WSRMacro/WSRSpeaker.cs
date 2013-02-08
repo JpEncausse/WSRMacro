@@ -26,6 +26,29 @@ namespace net.encausse.sarah {
     }
 
     // ==========================================
+    //  WSRMacro CONSTRUCTOR
+    // ==========================================
+
+    protected WSRSpeaker() {
+
+      // Build synthesizer
+      synthesizer = new SpeechSynthesizer();
+      synthesizer.SetOutputToDefaultAudioDevice();
+      synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(synthesizer_SpeakCompleted);
+
+      foreach (InstalledVoice voice in synthesizer.GetInstalledVoices()) {
+        VoiceInfo info = voice.VoiceInfo;
+        WSRConfig.GetInstance().logInfo("TTS", "Name: " + info.Name + " Culture: " + info.Culture);
+      }
+
+      String v = WSRConfig.GetInstance().voice;
+      if (v != null && v.Trim() != "") {
+        WSRConfig.GetInstance().logInfo("TTS", "Select voice: " + v);
+        synthesizer.SelectVoice(v);
+      }
+    }
+
+    // ==========================================
     //  WSRMacro SPEECH
     // ==========================================
 
@@ -33,13 +56,6 @@ namespace net.encausse.sarah {
     public bool Speak(String tts) {
 
       if (tts == null) { return false; }
-
-      // Build synthesizer
-      if (synthesizer == null) {
-        synthesizer = new SpeechSynthesizer();
-        synthesizer.SetOutputToDefaultAudioDevice();
-        synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(synthesizer_SpeakCompleted);
-      }
 
       WSRConfig.GetInstance().logInfo("TTS", "Say: " + tts);
       speaking = true;

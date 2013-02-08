@@ -32,6 +32,7 @@ namespace net.encausse.sarah {
 
     // Engine language
     public String language = "fr-FR";
+    public String voice = null;
 
     // Websocket port
     public int websocket = -1;
@@ -134,6 +135,7 @@ namespace net.encausse.sarah {
           else if (property.Key == "adaptation") { adaptation = bool.Parse(property.Value); }
           else if (property.Key == "loopback")   { loopback = int.Parse(property.Value, culture); }
           else if (property.Key == "language")   { language = property.Value;  }
+          else if (property.Key == "voice")      { voice = property.Value; }
           else if (property.Key == "debug")      { DEBUG = bool.Parse(property.Value); }
 
           else if (property.Key == "server")     { server = property.Value; }
