@@ -46,6 +46,10 @@ namespace net.encausse.sarah {
     bool gesture  = false;
     bool picture  = false;
 
+    public int faceTrackingOn = 6;
+    public int faceTrackingOff = 24;
+    public int faceTrackingReq = 5;
+
     // ==========================================
     //  CONSTRUCTOR
     // ==========================================
@@ -145,6 +149,10 @@ namespace net.encausse.sarah {
           else if (property.Key == "gesture")    { gesture = bool.Parse(property.Value); }
           else if (property.Key == "picture")    { picture = bool.Parse(property.Value); }
           else if (property.Key == "websocket")  { websocket = int.Parse(property.Value, culture); }
+
+          else if (property.Key == "faceTrackingOn")  { faceTrackingOn = int.Parse(property.Value, culture); }
+          else if (property.Key == "faceTrackingOff") { faceTrackingOff = int.Parse(property.Value, culture); }
+          else if (property.Key == "faceTrackingReq") { faceTrackingReq = int.Parse(property.Value, culture); }
         }
       }
     }

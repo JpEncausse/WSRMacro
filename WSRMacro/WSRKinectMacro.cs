@@ -287,7 +287,7 @@ namespace net.encausse.sarah {
 
       // Throttle
       var delta = DateTime.Now - lastFaceRecognition;
-      if (delta.TotalMilliseconds < 1000 * 5){ return; }
+      if (delta.TotalMilliseconds < 1000 * WSRConfig.GetInstance().faceTrackingReq){ return; }
       lastFaceRecognition = DateTime.Now;
 
       // Send HTTP Request

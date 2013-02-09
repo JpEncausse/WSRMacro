@@ -143,7 +143,8 @@ namespace net.encausse.sarah {
 
       // Update Detection
       if (threshold-- <= 0) {
-        threshold = visible ? 6 : 24;
+        threshold = visible ? WSRConfig.GetInstance().faceTrackingOn 
+                            : WSRConfig.GetInstance().faceTrackingOff;
         WSRFaceRecognition.GetInstance().UpdateDetection(bitmap);
       }
 
