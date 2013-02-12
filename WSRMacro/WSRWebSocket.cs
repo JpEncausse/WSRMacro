@@ -19,16 +19,11 @@ namespace net.encausse.sarah {
     //  WEBSOCKET MANAGER
     // ==========================================
 
-    private WSRKinectMacro wsr;
-    public WebSocketManager(WSRKinectMacro wsr) {
-      this.wsr = wsr;
-    }
-
     protected WebSocketServer websocket = null;
     List<IWebSocketConnection> sockets = new List<IWebSocketConnection>();
 
     public bool SetupWebSocket() {
-      if (WSRConfig.GetInstance().websocket < 0) {
+      if (WSRConfig.GetInstance().websocket <= 0) {
         return false;
       }
       websocket = new WebSocketServer("ws://localhost:" + WSRConfig.GetInstance().websocket);
@@ -42,7 +37,7 @@ namespace net.encausse.sarah {
           sockets.Remove(socket);
         };
         socket.OnMessage = message => {
-          SendWebSocket();
+          SendWebSocket(socket);
         };
       });
       return true;
@@ -52,12 +47,16 @@ namespace net.encausse.sarah {
     //  COLOR FRAME
     // ==========================================
 
+    // Do not send on FrameReady, instead wait sockets to ask for
     public void SensorColorFrameReady(object sender, ColorImageFrameReadyEventArgs e) {
-      // SendWebSocket();
+      // foreach (var socket in sockets) {
+      //   SendWebSocket(socket);
+      // }
     }
 
-    private void SendWebSocket() {
 
+    private void SendWebSocket(IWebSocketConnection socket) {
+      WSRKinectMacro wsr = (WSRKinectMacro) WSRMacro.GetInstance();
       WriteableBitmap bitmap = wsr.NewColorBitmap(); // Always because of thread sockets
       Bitmap image = wsr.GetColorPNG(bitmap);
       MemoryStream ms = new MemoryStream();
@@ -66,15 +65,12 @@ namespace net.encausse.sarah {
 
       byte[] imgByte = ms.ToArray();
       string base64String = Convert.ToBase64String(imgByte);
-      SendWebSocket(base64String);
+      SendWebSocket(socket, base64String);
     }
 
-    protected void SendWebSocket(string message) {
+    protected void SendWebSocket(IWebSocketConnection socket, String message) {
       if (websocket == null) { return; }
-
-      foreach (var socket in sockets) {
-        socket.Send(message);
-      }
+      socket.Send(message);
     }
   }
 }

@@ -61,12 +61,14 @@ namespace net.encausse.sarah {
     // ==========================================
 
     public override void HandleCtxMenu(ContextMenuStrip menu) {
-      
-      var item = new ToolStripMenuItem();
-      item.Text = "Kinect";
-      item.Click += new EventHandler(Kinect_Click);
-      item.Image = net.encausse.sarah.Properties.Resources.Kinect;
-      menu.Items.Add(item); 
+
+      if (WSRConfig.GetInstance().facetrack > 0) {
+        var item = new ToolStripMenuItem();
+        item.Text = "Kinect";
+        item.Click += new EventHandler(Kinect_Click);
+        item.Image = net.encausse.sarah.Properties.Resources.Kinect;
+        menu.Items.Add(item);
+      }
 
       // Super
       base.HandleCtxMenu(menu);
@@ -87,7 +89,7 @@ namespace net.encausse.sarah {
       }
 
       // Build Gesture Manager
-      gestureMgr = new GestureManager(this);
+      gestureMgr = new GestureManager();
 
       // Load Gestures from directories
       foreach (string directory in WSRConfig.GetInstance().directories) {
@@ -187,7 +189,6 @@ namespace net.encausse.sarah {
 
     public void SetupColorFrame(KinectSensor sensor) {
 
-      if (!WSRConfig.GetInstance().IsPictureMode()) { return; }
       logInfo("KINECT", "Starting Color sensor");
 
       // Turn on the color stream to receive color frames
@@ -204,17 +205,21 @@ namespace net.encausse.sarah {
       sensor.ColorFrameReady += new EventHandler<ColorImageFrameReadyEventArgs>(handle_ColorFrameReady);
 
       // Init QRCode ----------
-      QRCodeManager qrmgr = new QRCodeManager(this);
-      sensor.ColorFrameReady += qrmgr.SensorColorFrameReady;
+      QRCodeManager qrmgr = new QRCodeManager();
+      if (qrmgr.SetupQRCode()) {
+        sensor.ColorFrameReady += qrmgr.SensorColorFrameReady;
+      }
 
       // Init WebSocket ----------
-      WebSocketManager wsmgr = new WebSocketManager(this);
+      WebSocketManager wsmgr = new WebSocketManager();
       if (wsmgr.SetupWebSocket()) {
         sensor.ColorFrameReady += wsmgr.SensorColorFrameReady;
       }
 
       // Init WSRCamera ----------
-      WSRCamera.Start();
+      if (WSRConfig.GetInstance().facetrack > 0) {
+        WSRCamera.Start();
+      }
     }
 
     protected void handle_ColorFrameReady(object sender, ColorImageFrameReadyEventArgs e) {
@@ -260,6 +265,10 @@ namespace net.encausse.sarah {
         return null;
       }
 
+      if (!WSRConfig.GetInstance().IsPictureMode()) { 
+        return null;
+      }
+
       if (null == colorBitmap) {
         colorBitmap = NewColorBitmap();
       }
@@ -287,7 +296,7 @@ namespace net.encausse.sarah {
 
       // Throttle
       var delta = DateTime.Now - lastFaceRecognition;
-      if (delta.TotalMilliseconds < 1000 * WSRConfig.GetInstance().faceTrackingReq){ return; }
+      if (delta.TotalMilliseconds < 1000 * WSRConfig.GetInstance().facetrack) { return; }
       lastFaceRecognition = DateTime.Now;
 
       // Send HTTP Request
@@ -315,8 +324,10 @@ namespace net.encausse.sarah {
       // Update ColorBitmap
       UpdateColorBitmap(bitmap);
 
-      // Create a png bitmap encoder which knows how to save a .png file
       BitmapEncoder encoder = new PngBitmapEncoder();
+
+      // Create a png bitmap encoder which knows how to save a .png file
+      encoder.Frames.Clear();
 
       // Create frame from the writable bitmap and add to encoder
       encoder.Frames.Add(BitmapFrame.Create(bitmap));

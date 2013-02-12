@@ -2,6 +2,7 @@
 using System.Text;
 using System.IO;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.Windows;
 using System.Windows.Media.Imaging;
@@ -12,6 +13,9 @@ using Emgu.CV;
 using Emgu.CV.UI;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
+using System.Threading.Tasks;
+using System.Diagnostics;
+using System.Threading;
 
 
 namespace net.encausse.sarah {
@@ -50,21 +54,45 @@ namespace net.encausse.sarah {
       haarCascade = new HaarCascade(@"Camera\haarcascade_frontalface_alt_tree.xml");
     }
 
-    private Image<Gray, Byte> grayFrame;
-    public void UpdateDetection(WriteableBitmap bitmap) {
+    Image<Bgr, Byte> colorFrame = null;
+    private int threshold;
+    public void UpdateDetectionAsync(WriteableBitmap bitmap) {
       
-      // Buid Color Frame
-      var colorFrame = new Image<Bgr, Byte>(GetBitmapFromBitmapSource(bitmap));
+      if (threshold-- > 0) { return; } threshold = 12;
+      if (colorFrame != null) { WSRConfig.GetInstance().logDebug("FACERECO", " ByPass detection"); return; }
+
+      colorFrame = new Image<Bgr, Byte>(GetBitmapFromBitmapSource(bitmap));
+      Task.Factory.StartNew(() => {
+        UpdateDetection(colorFrame);
+        colorFrame = null;
+      });
+    }
+
+    public void UpdateDetectionSync(WriteableBitmap bitmap) {
+      if (threshold-- > 0) { return; }  threshold = 12;
+      if (colorFrame != null) { WSRConfig.GetInstance().logDebug("FACERECO", " ByPass detection"); return; }
+
+      colorFrame = new Image<Bgr, Byte>(GetBitmapFromBitmapSource(bitmap));
+      UpdateDetection(colorFrame);
+      colorFrame = null;
+    }
+
+    private Image<Gray, Byte> cachedFrame;
+    public void UpdateDetection(Image<Bgr, Byte> colorFrame) {
+      
+      // Start timer
+      Stopwatch stopWatch = new Stopwatch();
+      stopWatch.Start();
 
       // Convert it to Grayscale
-      grayFrame = colorFrame.Convert<Gray, Byte>();
+      Image<Gray, Byte> grayFrame = colorFrame.Convert<Gray, Byte>();
 
       // Face Detection (where ?)
       MCvAvgComp[][] facesDetected = grayFrame.DetectHaarCascade(haarCascade, 1.2, 2,
       Emgu.CV.CvEnum.HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new System.Drawing.Size(80, 80));
 
       // Face Recognition
-      cachedResults.Clear();
+      var workingResults = new Dictionary<Rectangle, String>(5);
       foreach (MCvAvgComp f in facesDetected[0]) {
         if (f.rect == null) { continue; }
         String name = "Inconnu";
@@ -72,14 +100,30 @@ namespace net.encausse.sarah {
           Image<Gray, byte> result = grayFrame.Copy(f.rect).Resize(100, 100, Emgu.CV.CvEnum.INTER.CV_INTER_CUBIC);
           name = recognizer.Recognize(result);
         }
-        cachedResults.Add(f.rect, name);
+        workingResults.Add(f.rect, name);
       }
 
-      // Send match
-      if (cachedResults.Count > 0) {
+      // Have results
+      if (workingResults.Count > 0) {
+
+        // Cache frame
+        cachedFrame = grayFrame;
+
+        // Send match
         var matches = new List<String>(cachedResults.Values);
         ((WSRKinectMacro)WSRMacro.GetInstance()).HandleFaceComplete(matches);
       }
+
+      // Update cache
+      lock (cachedResults) {
+        cachedResults = workingResults;
+      }
+
+      // Print timer
+      stopWatch.Stop();
+      TimeSpan ts = stopWatch.Elapsed;
+      WSRConfig.GetInstance().logDebug("FACERECO", "Detection: " + String.Format("{0:00}:{1:00}:{2:00}.{3:00}", ts.Hours, ts.Minutes, ts.Seconds, ts.Milliseconds / 10));
+
     }
 
     // ==========================================
@@ -112,19 +156,20 @@ namespace net.encausse.sarah {
     }
 
     public BitmapSource TrainFace(String label) {
+      if (cachedFrame == null) { return null; }
 
       // Get a gray frame from capture device
-      Image<Gray, Byte> sample = grayFrame.Resize(320, 240, Emgu.CV.CvEnum.INTER.CV_INTER_CUBIC);
+      Image<Gray, Byte> sample = cachedFrame.Resize(320, 240, Emgu.CV.CvEnum.INTER.CV_INTER_CUBIC);
 
       // Perform Face Detection
       MCvAvgComp[][] facesDetected = sample.DetectHaarCascade(haarCascade, 1.2, 10,
       Emgu.CV.CvEnum.HAAR_DETECTION_TYPE.DO_CANNY_PRUNING, new System.Drawing.Size(20, 20));
 
       // Retrieve trained face
-      Image<Gray, byte> trainedFace = null;
+      Image<Gray, byte> trainedFace = null; 
       foreach (MCvAvgComp f in facesDetected[0]) {
         trainedFace = sample.Copy(f.rect).Resize(100, 100, Emgu.CV.CvEnum.INTER.CV_INTER_CUBIC);
-        break;
+        if (trainedFace != null) { break; } // No face detected
       }
       if (trainedFace == null) { return null; } // No face detected
 

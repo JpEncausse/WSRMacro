@@ -7,6 +7,7 @@ using Microsoft.Kinect;
 using ZXing;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Threading.Tasks;
 
 namespace net.encausse.sarah {
 
@@ -22,45 +23,56 @@ namespace net.encausse.sarah {
     //  QRCODE MANAGER
     // ==========================================
 
-    private WSRKinectMacro wsr;
-    
-    public QRCodeManager(WSRKinectMacro wsr) {
-      this.wsr = wsr;
-    }
+    private WriteableBitmap bitmap;
 
     private void fireQRCode(String match) {
-      wsr.HandleQRCodeComplete(match);
+      ((WSRKinectMacro)WSRMacro.GetInstance()).HandleQRCodeComplete(match);
+    }
+
+    public bool SetupQRCode() {
+      if (WSRConfig.GetInstance().qrcode <= 0) {
+        return false;
+      }
+      WSRConfig.GetInstance().logInfo("QRCODE", "Starting QRCode manager");
+      return true;
     }
 
     // ==========================================
     //  COLOR FRAME
     // ==========================================
 
+    Bitmap image = null;
     public void SensorColorFrameReady(object sender, ColorImageFrameReadyEventArgs e) {
+
+      if (bitmap == null) {
+        bitmap = ((WSRKinectMacro)WSRMacro.GetInstance()).NewColorBitmap();
+      }
+
       CheckQRCode();
     }
 
     int threshold = 0;
-    private WriteableBitmap bitmap;
     public void CheckQRCode() {
-      if (threshold-- != 0) { return; } threshold = 24;
+      if (threshold-- > 0) { return; } threshold = WSRConfig.GetInstance().qrcode;
+      if (image != null) { return; }
 
-      // Build bitmap in current thread
-      if (bitmap == null) {
-        bitmap = wsr.NewColorBitmap();
-      }
+      image = ((WSRKinectMacro)WSRMacro.GetInstance()).GetColorPNG(bitmap);
+      Task.Factory.StartNew(() => {
+        CheckQRCodeAsync(image);
+        image.Dispose();
+        image = null;
+      });
+    }
 
-      Result result = null;
-      using (Bitmap image = wsr.GetColorPNG(bitmap)) {
-        result = reader.Decode(image);
-      }
-      
-      if (result != null) {
-        String type = result.BarcodeFormat.ToString();
-        String match = result.Text;
-        WSRConfig.GetInstance().logInfo("QRCODE", "Type: " + type + " Content: " + match);
-        fireQRCode(match);
-      }
+    public void CheckQRCodeAsync(Bitmap image) {
+
+      Result result = result = reader.Decode(image);
+      if (result == null) { return; }
+
+      String type  = result.BarcodeFormat.ToString();
+      String match = result.Text;
+      WSRConfig.GetInstance().logInfo("QRCODE", "Type: " + type + " Content: " + match);
+      fireQRCode(match);
     }
   }
 }

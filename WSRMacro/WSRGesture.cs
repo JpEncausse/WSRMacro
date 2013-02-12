@@ -360,12 +360,7 @@ namespace net.encausse.sarah {
     public List<Gesture> gestures = new List<Gesture>();
     private Dictionary<int, GestureStateUser> userMap = new Dictionary<int, GestureStateUser>();
 
-    private WSRKinectMacro wsr;
-    private WSRConfig config;
-    public GestureManager(WSRKinectMacro wsr) {
-      this.wsr = wsr;
-      this.config = WSRConfig.GetInstance(); // Convenient
-    }
+    public GestureManager() {}
 
     bool started = false;
     public void Recognize(bool start) {
@@ -384,7 +379,7 @@ namespace net.encausse.sarah {
     // ------------------------------------------
 
     private void fireGesture(Gesture gesture) {
-      wsr.HandleGestureComplete(gesture);
+      ((WSRKinectMacro)WSRMacro.GetInstance()).HandleGestureComplete(gesture);
     }
 
     // ------------------------------------------
@@ -392,12 +387,12 @@ namespace net.encausse.sarah {
     // ------------------------------------------
 
     public void LoadGesture(String file, String name) {
-      config.logInfo("GESTURE", "Load file: " + name + " : " + file);
+      WSRConfig.GetInstance().logInfo("GESTURE", "Load file: " + name + " : " + file);
       Load(file);
     }
 
     public void LoadGestures(DirectoryInfo dir) {
-      config.logInfo("GESTURE", "Load directory: " + dir.FullName);
+      WSRConfig.GetInstance().logInfo("GESTURE", "Load directory: " + dir.FullName);
 
       // Load Grammar
       foreach (FileInfo f in dir.GetFiles("*.gesture")) {
@@ -423,12 +418,12 @@ namespace net.encausse.sarah {
             if (reader.Name == "gesture") {
               gesture = Gesture.Parse(reader);
               gestures.Add(gesture);
-              config.logInfo("GESTURE", "Loading: " + gesture.Description);
+              WSRConfig.GetInstance().logInfo("GESTURE", "Loading: " + gesture.Description);
             }
             if (reader.Name == "component" && gesture != null) {
               GestureComponent component = GestureComponent.Parse(reader);
               gesture.Components.Add(component);
-              config.logInfo("GESTURE", "Component: " + component.Log(gesture.Description));
+              WSRConfig.GetInstance().logInfo("GESTURE", "Component: " + component.Log(gesture.Description));
             }
             break;
         }
@@ -463,10 +458,10 @@ namespace net.encausse.sarah {
             userMap.Add(sd.TrackingId, user);
           }
 
-          config.logDebug("GESTURE", "Skeleton " + sd.Position.X + "," + sd.Position.Y + "," + sd.Position.Z);
+          WSRConfig.GetInstance().logDebug("GESTURE", "Skeleton " + sd.Position.X + "," + sd.Position.Y + "," + sd.Position.Z);
           Gesture gesture = userMap[sd.TrackingId].Evaluate(sd);
           if (gesture != null) {
-            config.logInfo("GESTURE", "Active User Gesture complete: " + gesture.Description);
+            WSRConfig.GetInstance().logInfo("GESTURE", "Active User Gesture complete: " + gesture.Description);
             fireGesture(gesture);
             userMap[sd.TrackingId].ResetAll(sd);
           }

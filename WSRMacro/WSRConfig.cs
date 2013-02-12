@@ -15,7 +15,8 @@ namespace net.encausse.sarah {
 
   public class WSRConfig {
     bool help = false;
-    
+    public bool DEBUG = false;
+
     // Grammar contex
     public List<string> directories = new List<string>();
     public List<string> context = new List<string>();
@@ -33,22 +34,25 @@ namespace net.encausse.sarah {
     // Engine language
     public String language = "fr-FR";
     public String voice = null;
-
-    // Websocket port
-    public int websocket = -1;
     
     // Httpserver port
     public int loopback = 8088;
+    
+    bool gesture = false;
+    bool picture = false;
 
-    public bool DEBUG = false;
+    // QRCode (check / frame)
+    public int qrcode = 0;
 
-    bool kinect   = false;
-    bool gesture  = false;
-    bool picture  = false;
+    // Face Tracking (req / s)
+    public int facetrack = 0;
+    public bool terminator = false;
 
-    public int faceTrackingOn = 6;
-    public int faceTrackingOff = 24;
-    public int faceTrackingReq = 5;
+    // Websocket port
+    public int websocket = -1;
+
+    // Internal
+    bool kinect = false; 
 
     // ==========================================
     //  CONSTRUCTOR
@@ -79,7 +83,6 @@ namespace net.encausse.sarah {
         { "g|gesture", "the {KINECT} gesture mode. (default is false)", v => gesture = v != null },
         { "f|picture", "the {KINECT} picture mode. (default is false)", v => picture = v != null },
         { "h|help",  "show this message and exit", v => help = v != null },
-        
         
         { "sck|websocket=",  "the websocket server port (should be 7777)", v => websocket = int.Parse(v, culture) },
         
@@ -131,7 +134,7 @@ namespace net.encausse.sarah {
             directories.Add(property.Value);
           }
           else if (section.Name == "context") {
-            context.Add(property.Value);
+            context.Add(property.Value); 
           }
           else if (property.Key == "trigger")    { trigger = double.Parse(property.Value, culture); }
           else if (property.Key == "confidence") { confidence = double.Parse(property.Value, culture); }
@@ -148,11 +151,10 @@ namespace net.encausse.sarah {
           else if (property.Key == "kinect")     { kinect = bool.Parse(property.Value); }
           else if (property.Key == "gesture")    { gesture = bool.Parse(property.Value); }
           else if (property.Key == "picture")    { picture = bool.Parse(property.Value); }
+          else if (property.Key == "qrcode")     { qrcode = int.Parse(property.Value, culture); }
+          else if (property.Key == "facetrack")  { facetrack = int.Parse(property.Value, culture); }
+          else if (property.Key == "terminator") { terminator = bool.Parse(property.Value); }
           else if (property.Key == "websocket")  { websocket = int.Parse(property.Value, culture); }
-
-          else if (property.Key == "faceTrackingOn")  { faceTrackingOn = int.Parse(property.Value, culture); }
-          else if (property.Key == "faceTrackingOff") { faceTrackingOff = int.Parse(property.Value, culture); }
-          else if (property.Key == "faceTrackingReq") { faceTrackingReq = int.Parse(property.Value, culture); }
         }
       }
     }

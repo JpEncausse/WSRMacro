@@ -30,8 +30,8 @@ namespace net.encausse.sarah {
     public static void Start() {
       Thread thread = new Thread(() => {
         camera = new WSRCamera();
-        // camera.Show();
-        // camera.Closed += (sender2, e2) => camera.Dispatcher.InvokeShutdown();
+     // camera.Show();
+     // camera.Closed += (sender2, e2) => camera.Dispatcher.InvokeShutdown();
         camera.Closing += (sender2, e2) => { camera.Hide(); e2.Cancel = true; };
         System.Windows.Threading.Dispatcher.Run();
       });
@@ -136,17 +136,13 @@ namespace net.encausse.sarah {
       this.bitmap = BitmapFactory.ConvertToPbgra32Format(this.bitmap);
     }
 
-    private int threshold;
     private void SensorColorFrameReady(object sender, ColorImageFrameReadyEventArgs e) {
+
       // Copy pixel array
       ((WSRKinectMacro)WSRMacro.GetInstance()).UpdateColorBitmap(bitmap);
-
+      
       // Update Detection
-      if (threshold-- <= 0) {
-        threshold = visible ? WSRConfig.GetInstance().faceTrackingOn 
-                            : WSRConfig.GetInstance().faceTrackingOff;
-        WSRFaceRecognition.GetInstance().UpdateDetection(bitmap);
-      }
+      WSRFaceRecognition.GetInstance().UpdateDetectionAsync(bitmap); 
 
       // Draw Detection
       if (visible) {
@@ -158,55 +154,79 @@ namespace net.encausse.sarah {
     //  DRAWING RESULTS
     // ==========================================
 
-    // WriteableBitmap wBmp1, wBmp2;
     private void DrawDetection() {
       this.bitmap.Lock();
 
-      /*
-      if (wBmp1 == null) {
-        wBmp1 = new WriteableBitmap(new BitmapImage(new Uri(@"Camera/TerminatorHUD1.png", UriKind.Relative)));
-        wBmp1 = BitmapFactory.ConvertToPbgra32Format(wBmp1);
-        wBmp2 = new WriteableBitmap(new BitmapImage(new Uri(@"Camera/TerminatorHUD2.png", UriKind.Relative)));
-        wBmp2 = BitmapFactory.ConvertToPbgra32Format(wBmp2);
-      }
-
-      this.bitmap.Blit(new System.Windows.Point(0, 0), wBmp1, new Rect(0, 0, wBmp1.PixelWidth, wBmp1.PixelHeight), Colors.White, WriteableBitmapExtensions.BlendMode.Multiply);
-      this.bitmap.Blit(new System.Windows.Point(0, 0), wBmp2, new Rect(0, 0, wBmp2.PixelWidth, wBmp2.PixelHeight), Colors.White, WriteableBitmapExtensions.BlendMode.Alpha);
-      */
+      DrawInit();
+      DrawBefore(this.bitmap);
 
       foreach (KeyValuePair<System.Drawing.Rectangle, String> entry in WSRFaceRecognition.GetInstance().GetResults()) {
         var name = entry.Value;
         var r = entry.Key;
-        var color = Color.FromArgb(255, 255, 255, 255);
 
-        this.bitmap.DrawRectangle(r.Left, r.Top, r.Width + r.Left, r.Height + r.Top, color);
-        this.bitmap.DrawRectangle(r.Left + 1, r.Top + 1, r.Width - 1 + r.Left, r.Height - 1 + r.Top, color);
-        DrawText(this.bitmap, name, 16, r.Left, r.Top + r.Height);
+        DrawLoop(this.bitmap, r, name);
 
         if (textBox_Name.Text == "") { 
           textBox_Name.Text = name; 
         }
-
-        /*
-        this.bitmap.DrawEllipse(r.Left, r.Top, r.Width + r.Left, r.Height + r.Top, color);
-        this.bitmap.DrawEllipse(r.Left + 1, r.Top + 1, r.Width - 1 + r.Left, r.Height - 1 + r.Top, color);
-        this.bitmap.DrawEllipse(r.Left + 2, r.Top + 2, r.Width - 2 + r.Left, r.Height - 2 + r.Top, color);
-
-        var x1 = r.Left + r.Width / 2;
-        var y1 = r.Top;
-
-        this.bitmap.DrawLine(x1, y1,     x1 + 50, y1     - 50, color);
-        this.bitmap.DrawLine(x1, y1 - 1, x1 + 50, y1 - 1 - 50, color);
-        this.bitmap.DrawLine(x1, y1 - 2, x1 + 50, y1 - 2 - 50, color);
-
-        this.bitmap.DrawLine(x1 + 50, y1 - 50,     x1 + 100, y1 - 50,     color);
-        this.bitmap.DrawLine(x1 + 50, y1 - 50 - 1, x1 + 100, y1 - 50 - 1, color);
-        this.bitmap.DrawLine(x1 + 50, y1 - 50 - 2, x1 + 100, y1 - 50 - 2, color);
-
-        DrawText(this.bitmap, name, 16, x1 + 100 + 5, y1 - 50 - 20);
-        */
       }
+
+      DrawAfter(this.bitmap);
       this.bitmap.Unlock();
+    }
+
+    WriteableBitmap wBmp1, wBmp2;
+    Color color;
+    private void DrawInit(){
+      if (wBmp1 != null && wBmp2 != null) { return; }
+      if (!WSRConfig.GetInstance().terminator) { return; }
+
+      wBmp1 = new WriteableBitmap(new BitmapImage(new Uri(@"Camera/TerminatorHUD1.png", UriKind.Relative)));
+      wBmp1 = BitmapFactory.ConvertToPbgra32Format(wBmp1);
+
+      wBmp2 = new WriteableBitmap(new BitmapImage(new Uri(@"Camera/TerminatorHUD2.png", UriKind.Relative)));
+      wBmp2 = BitmapFactory.ConvertToPbgra32Format(wBmp2);
+
+      color = Color.FromArgb(255, 255, 255, 255);
+    }
+
+    private void DrawBefore(WriteableBitmap bitmap){
+      if (!WSRConfig.GetInstance().terminator) { return; }
+      bitmap.Blit(new System.Windows.Point(0, 0), wBmp1, new Rect(0, 0, wBmp1.PixelWidth, wBmp1.PixelHeight), Colors.White, WriteableBitmapExtensions.BlendMode.Multiply);
+      bitmap.Blit(new System.Windows.Point(0, 0), wBmp2, new Rect(0, 0, wBmp2.PixelWidth, wBmp2.PixelHeight), Colors.White, WriteableBitmapExtensions.BlendMode.Alpha);
+    }
+    
+    private void DrawLoop(WriteableBitmap bitmap, System.Drawing.Rectangle r, String name) {
+      if (WSRConfig.GetInstance().terminator) {
+        DrawLoop_Terminator(bitmap, r, name);
+        return; 
+      }
+      this.bitmap.DrawRectangle(r.Left, r.Top, r.Width + r.Left, r.Height + r.Top, color);
+      this.bitmap.DrawRectangle(r.Left + 1, r.Top + 1, r.Width - 1 + r.Left, r.Height - 1 + r.Top, color);
+      DrawText(this.bitmap, name, 16, r.Left, r.Top + r.Height);
+    }
+    
+    private void DrawLoop_Terminator(WriteableBitmap bitmap, System.Drawing.Rectangle r, String name) {
+      bitmap.DrawEllipse(r.Left, r.Top, r.Width + r.Left, r.Height + r.Top, color);
+      bitmap.DrawEllipse(r.Left + 1, r.Top + 1, r.Width - 1 + r.Left, r.Height - 1 + r.Top, color);
+      bitmap.DrawEllipse(r.Left + 2, r.Top + 2, r.Width - 2 + r.Left, r.Height - 2 + r.Top, color);
+
+      var x1 = r.Left + r.Width / 2;
+      var y1 = r.Top;
+
+      bitmap.DrawLine(x1, y1, x1 + 50, y1 - 50, color);
+      bitmap.DrawLine(x1, y1 - 1, x1 + 50, y1 - 1 - 50, color);
+      bitmap.DrawLine(x1, y1 - 2, x1 + 50, y1 - 2 - 50, color);
+
+      bitmap.DrawLine(x1 + 50, y1 - 50, x1 + 100, y1 - 50, color);
+      bitmap.DrawLine(x1 + 50, y1 - 50 - 1, x1 + 100, y1 - 50 - 1, color);
+      bitmap.DrawLine(x1 + 50, y1 - 50 - 2, x1 + 100, y1 - 50 - 2, color);
+
+      DrawText(bitmap, name, 16, x1 + 100 + 5, y1 - 50 - 20);
+    }
+
+    private void DrawAfter(WriteableBitmap bitmap) {
+
     }
 
     // ==========================================
