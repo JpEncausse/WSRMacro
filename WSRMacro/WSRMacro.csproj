@@ -106,6 +106,7 @@
     <Content Include="macros\time.xml">
       <SubType>Designer</SubType>
     </Content>
+    <Content Include="plugins\xbmc\xbmc.xml" />
     <Content Include="Resources\exit.png" />
     <Content Include="Resources\Home.ico" />
     <Content Include="Resources\kinect.png" />
