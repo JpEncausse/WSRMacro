@@ -50,6 +50,7 @@ namespace net.encausse.sarah {
 
     // Websocket port
     public int websocket = -1;
+    public string websocktype = "png";
 
     // Internal
     bool kinect = false; 
@@ -85,7 +86,7 @@ namespace net.encausse.sarah {
         { "h|help",  "show this message and exit", v => help = v != null },
         
         { "sck|websocket=",  "the websocket server port (should be 7777)", v => websocket = int.Parse(v, culture) },
-        
+        { "websocktype=",    "the websocket image format (jpg/png)", v => websocktype = v }
       };
     }
 

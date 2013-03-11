@@ -90,6 +90,9 @@
     <Content Include="plugins\face\face.xml">
       <SubType>Designer</SubType>
     </Content>
+    <Content Include="plugins\fitbit\fitbit.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="plugins\gesture\gesture.xml">
       <SubType>Designer</SubType>
     </Content>

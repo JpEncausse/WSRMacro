@@ -13,15 +13,14 @@ using System.Drawing.Imaging;
 using System.Windows.Forms;
 using Microsoft.Kinect;
 
-/*
+
 using System.Speech.Recognition;
 using System.Speech.AudioFormat;
-*/
 
+/*
 using Microsoft.Speech.Recognition;
 using Microsoft.Speech.AudioFormat;
-
-
+*/
 namespace net.encausse.sarah {
 
   public class WSRKinectMacro : WSRMacro {
@@ -99,6 +98,7 @@ namespace net.encausse.sarah {
 
       // Plugin in Kinect Sensor
       logInfo("KINECT", "Starting Skeleton sensor");
+      // sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Seated;
       sensor.SkeletonStream.Enable();
     }
 
@@ -213,7 +213,7 @@ namespace net.encausse.sarah {
       // Init WebSocket ----------
       WebSocketManager wsmgr = new WebSocketManager();
       if (wsmgr.SetupWebSocket()) {
-        sensor.ColorFrameReady += wsmgr.SensorColorFrameReady;
+        wsmgr.SetupGreenScreen(sensor);
       }
 
       // Init WSRCamera ----------
@@ -273,7 +273,7 @@ namespace net.encausse.sarah {
         colorBitmap = NewColorBitmap();
       }
 
-      Bitmap image = GetColorPNG(colorBitmap);
+      Bitmap image = GetColorPNG(colorBitmap, true);
       BitmapEncoder encoder = new JpegBitmapEncoder();
       String time = System.DateTime.Now.ToString("hh'-'mm'-'ss", CultureInfo.CurrentUICulture.DateTimeFormat);
       String path = folder+"KinectSnapshot-" + time + ".jpg";
@@ -311,18 +311,21 @@ namespace net.encausse.sarah {
     // ==========================================
 
     public WriteableBitmap NewColorBitmap() {
+      return NewColorBitmap(ColorW, ColorH);
+    }
+    public WriteableBitmap NewColorBitmap(int w, int h) {
       return new WriteableBitmap(ColorW, ColorH, 96.0, 96.0, PixelFormats.Bgra32, null);
     }
 
     public void UpdateColorBitmap(WriteableBitmap bitmap) {
       var rect = new Int32Rect(0, 0, bitmap.PixelWidth, bitmap.PixelHeight);
-      bitmap.WritePixels(rect, ColorPixels, bitmap.PixelWidth * PixelFormats.Bgra32.BitsPerPixel / 8, 0);
+      bitmap.WritePixels(rect, ColorPixels, rect.Width * PixelFormats.Bgra32.BitsPerPixel / 8, 0);
     }
 
-    public Bitmap GetColorPNG(WriteableBitmap bitmap) {
+    public Bitmap GetColorPNG(WriteableBitmap bitmap, bool update) {
 
       // Update ColorBitmap
-      UpdateColorBitmap(bitmap);
+      if (update){ UpdateColorBitmap(bitmap); }
 
       BitmapEncoder encoder = new PngBitmapEncoder();
 

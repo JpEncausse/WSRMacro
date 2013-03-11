@@ -9,16 +9,16 @@ using System.Windows.Forms;
 using CloudSpeech;
 using System.Web;
 
-/*
+
 using System.Speech;
 using System.Speech.Recognition;
 using System.Speech.AudioFormat;
-*/
 
+/*
 using Microsoft.Speech;
 using Microsoft.Speech.Recognition;
 using Microsoft.Speech.AudioFormat; 
-
+*/
 
 
 namespace net.encausse.sarah {

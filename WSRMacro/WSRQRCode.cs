@@ -56,7 +56,7 @@ namespace net.encausse.sarah {
       if (threshold-- > 0) { return; } threshold = WSRConfig.GetInstance().qrcode;
       if (image != null) { return; }
 
-      image = ((WSRKinectMacro)WSRMacro.GetInstance()).GetColorPNG(bitmap);
+      image = ((WSRKinectMacro)WSRMacro.GetInstance()).GetColorPNG(bitmap, true);
       Task.Factory.StartNew(() => {
         CheckQRCodeAsync(image);
         image.Dispose();

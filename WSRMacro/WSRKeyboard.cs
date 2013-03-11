@@ -45,7 +45,7 @@ namespace net.encausse.sarah {
 
     public void SimulateKey(String key, int type, String mod) {
       WSRConfig.GetInstance().logInfo("KEYBOARD", "SimulateKey " + key + " + " + mod);
-      if (mod != null) {
+      if (mod != null && mod != "") {
         InputSimulator.SimulateModifiedKeyStroke(KeyCode(mod), KeyCode(key));
         return;
       }

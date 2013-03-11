@@ -262,11 +262,11 @@ namespace net.encausse.sarah {
       var sjoint2 = skeleton.Joints[component.Joint2]; //.ScaleTo(xScale, yScale);
 
       if (!isBegin) {
-        isBegin = CompareJointRelationship(sjoint1, sjoint2, component.Ending); // Weird switch
+        isBegin = CompareJointRelationship(sjoint1, sjoint2, component.Begin);
       }
 
-      if (!isEnding) {
-        return isEnding = CompareJointRelationship(sjoint1, sjoint2, component.Begin); // Weird switch
+      if (isBegin && !isEnding) {
+        return isEnding = CompareJointRelationship(sjoint1, sjoint2, component.Ending);
       }
 
       return true;
@@ -277,17 +277,17 @@ namespace net.encausse.sarah {
         case JointRelationship.None:
           return true;
         case JointRelationship.AboveAndLeft:
-          return ((inJoint1.Position.X < inJoint2.Position.X) && (inJoint1.Position.Y < inJoint2.Position.Y));
+          return ((inJoint1.Position.X < inJoint2.Position.X) && (inJoint2.Position.Y < inJoint1.Position.Y));
         case JointRelationship.AboveAndRight:
-          return ((inJoint1.Position.X > inJoint2.Position.X) && (inJoint1.Position.Y < inJoint2.Position.Y));
+          return ((inJoint1.Position.X > inJoint2.Position.X) && (inJoint2.Position.Y < inJoint1.Position.Y));
         case JointRelationship.BelowAndLeft:
-          return ((inJoint1.Position.X < inJoint2.Position.X) && (inJoint1.Position.Y > inJoint2.Position.Y));
+          return ((inJoint1.Position.X < inJoint2.Position.X) && (inJoint2.Position.Y > inJoint1.Position.Y));
         case JointRelationship.BelowAndRight:
-          return ((inJoint1.Position.X > inJoint2.Position.X) && (inJoint1.Position.Y > inJoint2.Position.Y));
+          return ((inJoint1.Position.X > inJoint2.Position.X) && (inJoint2.Position.Y > inJoint1.Position.Y));
         case JointRelationship.Below:
-          return inJoint1.Position.Y > inJoint2.Position.Y;
+          return inJoint2.Position.Y > inJoint1.Position.Y;
         case JointRelationship.Above:
-          return inJoint1.Position.Y < inJoint2.Position.Y;
+          return inJoint2.Position.Y < inJoint1.Position.Y;
         case JointRelationship.LeftOf:
           return inJoint1.Position.X < inJoint2.Position.X;
         case JointRelationship.RightOf:
@@ -330,23 +330,29 @@ namespace net.encausse.sarah {
       }
     }
 
-    public void ResetAll(Skeleton skeleton) {
+    public void ResetAll() {
       foreach (var state in gestureState) {
         state.Reset();
       }
     }
 
     public Gesture Evaluate(Skeleton skeleton) {
+      Gesture match = null;
       foreach (var state in gestureState) {
-        // Is gesture state complete ?
+
+        // Check gesture state complete
         if (!state.Evaluate(skeleton, DateTime.Now)) {
           continue;
         }
 
-        LastGestureCompletionTime = DateTime.Now;
-        return state.Gesture;
+        // Store the most complicated gesture
+        if (match == null || match.Components.Count <= state.Gesture.Components.Count) {
+          LastGestureCompletionTime = DateTime.Now;
+          match = state.Gesture;
+        }
+        
       }
-      return null;
+      return match;
     }
   }
 
@@ -435,6 +441,8 @@ namespace net.encausse.sarah {
     // ------------------------------------------
 
     protected int playerId;
+    protected Gesture match; // the current matching gesture
+    protected DateTime threshold = DateTime.Now;
 
     public void SensorSkeletonFrameReady(object sender, SkeletonFrameReadyEventArgs e) {
       using (SkeletonFrame skeletonFrameData = e.OpenSkeletonFrame()) {
@@ -458,21 +466,38 @@ namespace net.encausse.sarah {
             userMap.Add(sd.TrackingId, user);
           }
 
-          WSRConfig.GetInstance().logDebug("GESTURE", "Skeleton " + sd.Position.X + "," + sd.Position.Y + "," + sd.Position.Z);
+          // WSRConfig.GetInstance().logDebug("GESTURE", "Skeleton " + sd.Position.X + "," + sd.Position.Y + "," + sd.Position.Z);
           Gesture gesture = userMap[sd.TrackingId].Evaluate(sd);
           if (gesture != null) {
             WSRConfig.GetInstance().logInfo("GESTURE", "Active User Gesture complete: " + gesture.Description);
-            fireGesture(gesture);
-            userMap[sd.TrackingId].ResetAll(sd);
+
+            // Store the Gesture matching the most components
+            if (match == null || match.Components.Count <= gesture.Components.Count) {
+              match = gesture;
+            }
+
+            // Do not fire immediatly, wait a little bit
           }
 
           // This break prevents multiple player data from being confused during evaluation.
           // If one were going to dis-allow multiple players, this trackingId would facilitate
           // that feat.
           playerId = sd.TrackingId;
-
         }
       }
+
+      // Reset threshold
+      if ((DateTime.Now - threshold).TotalMilliseconds > 1000){
+        threshold = DateTime.Now;
+
+        // Fire the latest matching gesture on threshold
+        if (match != null) {
+          fireGesture(match);
+          userMap[playerId].ResetAll();
+          match = null;
+        }
+      }
+
     }
   }
 }

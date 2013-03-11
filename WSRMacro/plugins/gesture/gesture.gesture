@@ -1,12 +1,12 @@
-<gestures gestureResetTimeout="500">
-  
-  <gesture description="Hands Up" maxExecutionTime="1000" url="http://127.0.0.1:8080/sarah/gesture?g=5">
+<gestures gestureResetTimeout="1500">
+
+  <gesture description="Hands Up" maxExecutionTime="1500" url="http://127.0.0.1:8080/sarah/gesture?g=5">
     <component firstJoint="WristLeft"  secondJoint="ShoulderLeft"  beginningRelationship="BelowAndLeft"  endingRelationship="AboveAndLeft" />
     <component firstJoint="WristRight" secondJoint="ShoulderRight" beginningRelationship="BelowAndRight" endingRelationship="AboveAndRight" />
   </gesture>
-  <gesture description="Hands Down" maxExecutionTime="1000" url="http://127.0.0.1:8080/sarah/gesture?g=6">
-    <component firstJoint="WristLeft"  secondJoint="ShoulderLeft"  beginningRelationship="BelowAndLeft"  endingRelationship="AboveAndLeft" />
-    <component firstJoint="WristRight" secondJoint="ShoulderRight" beginningRelationship="BelowAndRight" endingRelationship="AboveAndRight" />
+  <gesture description="Hands Down" maxExecutionTime="1500" url="http://127.0.0.1:8080/sarah/gesture?g=6">
+    <component firstJoint="WristLeft"  secondJoint="ShoulderLeft"  beginningRelationship="AboveAndLeft"  endingRelationship="BelowAndLeft" />
+    <component firstJoint="WristRight" secondJoint="ShoulderRight" beginningRelationship="AboveAndRight" endingRelationship="BelowAndRight" />
   </gesture>
 
   
@@ -17,7 +17,7 @@
     <component firstJoint="WristLeft"  secondJoint="Spine"  beginningRelationship="LeftOf"  endingRelationship="RightOf" />
   </gesture>
   
-  
+
   <gesture description="Hand Left Up" maxExecutionTime="1000"  url="http://127.0.0.1:8080/sarah/gesture?g=1">
     <component firstJoint="WristLeft" secondJoint="ShoulderLeft" beginningRelationship="BelowAndLeft" endingRelationship="AboveAndLeft" />
   </gesture>

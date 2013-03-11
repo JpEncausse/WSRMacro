@@ -1,0 +1,13 @@
+﻿<grammar version="1.0" xml:lang="fr-FR" mode="voice" root="ruleFitbit" xmlns="http://www.w3.org/2001/06/grammar" tag-format="semantics/1.0">
+  <rule id="ruleFitbit" scope="public">
+    <example>Sarah combien j'ai marché de pas aujourd'hui ?</example>
+    <tag>out.action=new Object(); </tag>
+    <item weight="2">Sarah</item>
+    <one-of>
+      <item>combien j'ai marché de pas <tag>out.action.fitbit = "steps";</tag></item>
+      <item>combien j'ai monté d'étages<tag>out.action.fitbit = "floors";</tag></item>
+    </one-of>
+    <item>aujourd'hui</item>
+    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/fitbit";</tag>
+  </rule>
+</grammar>
