@@ -82,11 +82,17 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Camera\haarcascade_frontalface_alt_tree.xml" />
+    <Content Include="plugins\allocine\allocine.xml" />
     <Content Include="plugins\calendar\calendar.xml" />
-    <Content Include="plugins\chatterbot\lazyChatterbot.xml" />
+    <Content Include="plugins\chatterbot\lazyChatterbot.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="plugins\chatterbot\context.xml" />
+    <Content Include="plugins\debug\debug.xml" />
     <Content Include="plugins\dictionary\dictionary.xml" />
-    <Content Include="plugins\eedomus\eedomus.xml" />
+    <Content Include="plugins\eedomus\eedomus.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="plugins\face\face.xml">
       <SubType>Designer</SubType>
     </Content>
@@ -98,10 +104,13 @@
     </Content>
     <Content Include="plugins\karotz\karotz.xml" />
     <Content Include="plugins\kinect\kinect.xml" />
+    <Content Include="plugins\mail\mail.xml" />
     <Content Include="plugins\meteo\meteo.xml" />
-    <Content Include="plugins\movie\movie.xml">
+    <None Include="plugins\movie\movie.tmp">
       <SubType>Designer</SubType>
-    </Content>
+    </None>
+    <Content Include="plugins\simsimi\lazySimsimi.xml" />
+    <Content Include="plugins\simsimi\simsimi.xml" />
     <Content Include="plugins\vera\vera.xml" />
     <Content Include="plugins\werewolf\werewolf.xml">
       <SubType>Designer</SubType>
@@ -202,8 +211,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="audio\" />
     <Folder Include="medias\" />
-    <Folder Include="plugins\mail\" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Properties\Resources.resx">

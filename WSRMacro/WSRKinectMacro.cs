@@ -13,14 +13,14 @@ using System.Drawing.Imaging;
 using System.Windows.Forms;
 using Microsoft.Kinect;
 
-
+/*
 using System.Speech.Recognition;
 using System.Speech.AudioFormat;
+*/
 
-/*
 using Microsoft.Speech.Recognition;
 using Microsoft.Speech.AudioFormat;
-*/
+
 namespace net.encausse.sarah {
 
   public class WSRKinectMacro : WSRMacro {
@@ -97,8 +97,11 @@ namespace net.encausse.sarah {
       }
 
       // Plugin in Kinect Sensor
-      logInfo("KINECT", "Starting Skeleton sensor");
-      // sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Seated;
+      if (WSRConfig.GetInstance().IsSeatedGesture()) {
+        sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Seated;
+      }
+
+      logInfo("KINECT", "Starting Skeleton seated: " + WSRConfig.GetInstance().IsSeatedGesture());
       sensor.SkeletonStream.Enable();
     }
 
@@ -243,7 +246,7 @@ namespace net.encausse.sarah {
     public bool HandleQRCodeComplete(String match) {
 
       // Play sound effect for feedback
-      WSRSpeaker.GetInstance().PlayMP3("medias/qrcode.mp3");
+      WSRSpeaker.GetInstance().Play("medias/qrcode.mp3");
 
       if (match.StartsWith("http")) {
         WSRHttpManager.GetInstance().SendRequest(match);

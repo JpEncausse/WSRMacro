@@ -3,11 +3,10 @@
     <example>Sarah Recherche * sur Wikipedia</example>
     <tag>out.action=new Object(); </tag>
     
-    <item weight="2">Sarah</item>
-    <item>recherche</item>
+    <item>Sarah recherche</item>
     <ruleref special="GARBAGE" />
     <item>wikipedia</item>
-    
+
     <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/dictionary";</tag>
     <tag>out.action._attributes.dictation="true";</tag>
   </rule>

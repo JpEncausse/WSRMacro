@@ -78,11 +78,17 @@ namespace net.encausse.sarah {
       int port = WSRConfig.GetInstance().loopback;
 
       // 192.168.0.x
-      http = new HttpServer();
-      http.EndPoint = new IPEndPoint(GetIpAddress(), port);
-      http.RequestReceived += this.http_RequestReceived;
-      http.Start();
-      WSRConfig.GetInstance().logInfo("INIT", "Starting Server: http://" + http.EndPoint + "/");
+      try {
+        http = new HttpServer();
+        http.EndPoint = new IPEndPoint(GetIpAddress(), port);
+        http.Start();
+        http.RequestReceived += this.http_RequestReceived;
+        WSRConfig.GetInstance().logInfo("INIT", "Starting Server: http://" + http.EndPoint + "/");
+      }
+      catch (Exception ex) {
+        http = null;
+        WSRConfig.GetInstance().logInfo("HTTP", "Exception: " + ex.Message);
+      }
 
       // Localhost
       httpLocal = new HttpServer();
@@ -107,7 +113,7 @@ namespace net.encausse.sarah {
 
       // Handle custom request
       WSRMacro.GetInstance().HandleCustomRequest(e);
-
+      
       // Fake response
       using (var writer = new StreamWriter(e.Response.OutputStream)) {
         writer.Write(" ");

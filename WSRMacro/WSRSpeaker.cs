@@ -46,6 +46,7 @@ namespace net.encausse.sarah {
         WSRConfig.GetInstance().logInfo("TTS", "Select voice: " + v);
         synthesizer.SelectVoice(v);
       }
+      
     }
 
     // ==========================================
@@ -78,19 +79,27 @@ namespace net.encausse.sarah {
 
     List<String> played = new List<String>();
 
-    public bool PlayMP3(string fileName) {
+    public bool Stop(string key) {
+      if (key == null) { return false; }
+      played.Remove(key);
+      return true;
+    }
+
+
+    public bool Play(string fileName) {
 
       if (fileName == null) { return false; }
-
       if (fileName.StartsWith("http")) {
-        return StreamMP3(fileName);
+        return Stream(fileName);
       }
+
+      bool wav = fileName.EndsWith(".wav");
 
       speaking = true;
       WSRConfig.GetInstance().logInfo("PLAYER", "Start MP3 Player");
       using (var ms = File.OpenRead(fileName))
-      using (var mp3Reader = new Mp3FileReader(ms))
-      using (var pcmStream = WaveFormatConversionStream.CreatePcmStream(mp3Reader))
+      using (var reader = wav ? (WaveStream) new WaveFileReader(ms) : (WaveStream) new Mp3FileReader(ms))
+      using (var pcmStream = WaveFormatConversionStream.CreatePcmStream(reader))
       using (var baStream = new BlockAlignReductionStream(pcmStream))
       using (var waveOut = new WaveOut(WaveCallbackInfo.FunctionCallback())) {
         waveOut.Init(baStream);
@@ -101,19 +110,19 @@ namespace net.encausse.sarah {
         }
         played.Remove(fileName);
         waveOut.Stop();
-
       }
       WSRConfig.GetInstance().logInfo("PLAYER", "End MP3 Player");
       speaking = false;
       return true;
     }
 
-    public bool StreamMP3(string url) {
+    public bool Stream(string url) {
 
       if (url == null) { return false; }
 
       speaking = true;
       WSRConfig.GetInstance().logInfo("PLAYER", "Stream MP3 Player");
+      bool wav = url.EndsWith(".wav");
 
       using (var ms = new MemoryStream())
       using (var stream = WebRequest.Create(url).GetResponse().GetResponseStream()) {
@@ -123,8 +132,8 @@ namespace net.encausse.sarah {
           ms.Write(buffer, 0, read);
         }
         ms.Position = 0;
-        using (var mp3Reader = new Mp3FileReader(ms))
-        using (var pcmStream = WaveFormatConversionStream.CreatePcmStream(mp3Reader))
+        using (var reader = wav ? (WaveStream)new WaveFileReader(ms) : (WaveStream)new Mp3FileReader(ms))
+        using (var pcmStream = WaveFormatConversionStream.CreatePcmStream(reader))
         using (var baStream = new BlockAlignReductionStream(pcmStream))
         using (var waveOut = new WaveOut(WaveCallbackInfo.FunctionCallback())) {
           waveOut.Init(baStream);
@@ -140,12 +149,6 @@ namespace net.encausse.sarah {
 
       WSRConfig.GetInstance().logInfo("PLAYER", "End MP3 Player");
       speaking = false;
-      return true;
-    }
-
-    public bool StopMP3(string key) {
-      if (key == null) { return false; }
-      played.Remove(key);
       return true;
     }
   }

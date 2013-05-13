@@ -477,6 +477,10 @@ namespace net.encausse.sarah {
             }
 
             // Do not fire immediatly, wait a little bit
+            // Go go go
+            fireGesture(match);
+            userMap[playerId].ResetAll();
+            match = null;
           }
 
           // This break prevents multiple player data from being confused during evaluation.

@@ -18,9 +18,12 @@ namespace net.encausse.sarah {
     public bool DEBUG = false;
 
     // Grammar contex
+    public String name = "SARAH";
     public List<string> directories = new List<string>();
     public List<string> context = new List<string>();
+    public int ctxTimeout = 30000;
     private bool hasContext = false;
+    public string audioWatcher = "audio";
 
     public double trigger = 0.85;
     public double confidence = 0.70;
@@ -39,6 +42,7 @@ namespace net.encausse.sarah {
     public int loopback = 8088;
     
     bool gesture = false;
+    bool seated  = false;
     bool picture = false;
 
     // QRCode (check / frame)
@@ -80,8 +84,9 @@ namespace net.encausse.sarah {
         { "s|server=", "the NodeJS {SERVER}. (default is 127.0.0.1)", v => server = v },
         { "p|port=", "the NodeJS {PORT}. (default is 8080)", v => port = v },
         
-        { "k|kinect", "the {KINECT} mode. (default is false)", v => kinect = v != null },
+        { "k|kinect",  "the {KINECT} mode. (default is false)", v => kinect = v != null },
         { "g|gesture", "the {KINECT} gesture mode. (default is false)", v => gesture = v != null },
+        { "seated",    "the {KINECT} gesture seated mode. (default is false)", v => seated = v != null },
         { "f|picture", "the {KINECT} picture mode. (default is false)", v => picture = v != null },
         { "h|help",  "show this message and exit", v => help = v != null },
         
@@ -137,6 +142,8 @@ namespace net.encausse.sarah {
           else if (section.Name == "context") {
             context.Add(property.Value); 
           }
+          else if (property.Key == "ctxTimeout") { ctxTimeout = int.Parse(property.Value); }
+          else if (property.Key == "name")       { name = property.Value; }
           else if (property.Key == "trigger")    { trigger = double.Parse(property.Value, culture); }
           else if (property.Key == "confidence") { confidence = double.Parse(property.Value, culture); }
           else if (property.Key == "dictation")  { dictation = double.Parse(property.Value, culture); }
@@ -145,12 +152,14 @@ namespace net.encausse.sarah {
           else if (property.Key == "language")   { language = property.Value;  }
           else if (property.Key == "voice")      { voice = property.Value; }
           else if (property.Key == "debug")      { DEBUG = bool.Parse(property.Value); }
-
+          else if (property.Key == "audio")      { audioWatcher = property.Value; }
+            
           else if (property.Key == "server")     { server = property.Value; }
           else if (property.Key == "port")       { port = property.Value; }
 
           else if (property.Key == "kinect")     { kinect = bool.Parse(property.Value); }
           else if (property.Key == "gesture")    { gesture = bool.Parse(property.Value); }
+          else if (property.Key == "seated")     { seated = bool.Parse(property.Value); }
           else if (property.Key == "picture")    { picture = bool.Parse(property.Value); }
           else if (property.Key == "qrcode")     { qrcode = int.Parse(property.Value, culture); }
           else if (property.Key == "facetrack")  { facetrack = int.Parse(property.Value, culture); }
@@ -207,6 +216,10 @@ namespace net.encausse.sarah {
 
     public bool IsGestureMode() {
       return gesture;
+    }
+
+    public bool IsSeatedGesture() {
+      return seated;
     }
 
     public bool HasContext() {

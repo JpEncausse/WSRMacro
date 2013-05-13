@@ -7,38 +7,18 @@
         <tag>out.action._attributes.context = "default"</tag>
         <tag>out.action._attributes.tts = "mais de rien"</tag>
       </item>
+
+      <item>
+        Ma question est <ruleref special="GARBAGE" /> SARAH
+        <tag>out.action._attributes.dictation="true";</tag>
+      </item>
       
-      <!-- Name -->
-      <item>Comment <ruleref special="GARBAGE"/> appel<tag>out.action._attributes.tts = "Je m'appel SARAH"</tag></item>
-      <item>Quel <ruleref special="GARBAGE"/> ton nom <tag>out.action._attributes.tts = "Je m'appel SARAH"</tag></item>
-    
-      <!-- Tagline -->
-      <item>Que veux dire ton nom <tag>out.action._attributes.tts = "C'est un accronyme anglais"</tag></item>
-      <item>Que veux dire SARAH   <tag>out.action._attributes.tts = "C'est un accronyme anglais"</tag></item>
-      <item>Que signifie ton nom  <tag>out.action._attributes.tts = "C'est un accronyme anglais"</tag></item>
-      <item>Que signifie SARAH    <tag>out.action._attributes.tts = "C'est un accronyme anglais"</tag></item>
-    
-      <!-- Age -->
-      <item>Quel age <ruleref special="GARBAGE"/>     <tag>out.action._attributes.tts = "Je suis très jeune, j'apprends encore"</tag></item>
-      <item>Quand <ruleref special="GARBAGE"/> créé   <tag>out.action._attributes.tts = "Je suis très jeune, j'apprends encore"</tag></item>
-    
-      <!-- Birth -->
-      <item>Comment as tu ete créé<tag>out.action._attributes.tts = "je suis écrite en C Sharp et Java Script. "</tag></item>
-      <item>Comment as tu ete fait<tag>out.action._attributes.tts = "je suis écrite en C Sharp et Java Script. "</tag></item>
-    
-      <!-- Knowledge -->
-      <item>Qu'est ce <ruleref special="GARBAGE"/> intéresse  <tag>out.action._attributes.tts = "je trouve beaucoup de choses intéressantes"</tag></item>
-      <item>Comment apprends tu <ruleref special="GARBAGE"/><tag>out.action._attributes.tts = "je suis très curieuse, j'apprend de nouvelles choses tout le temps. "</tag></item>
-    
-      <!-- Feeling -->
-      <item>Comment a été ta journee<tag>out.action._attributes.tts = "elle a été très instructive, merci."</tag></item>
-      <item>Peux <ruleref special="GARBAGE"/> manger<tag>out.action._attributes.tts = "je dévore la connaissance"</tag></item>
-    
-      <!-- Miscs -->
-      <item>Comment <ruleref special="GARBAGE"/> le vélo<tag>out.action._attributes.tts = "l'équilibre est la clef. "</tag></item>
-      <item>Comment est fait <ruleref special="GARBAGE"/><tag>out.action._attributes.tts = "soigneusement. "</tag></item>
-      <item>Comment il a fait <ruleref special="GARBAGE"/><tag>out.action._attributes.tts = "peut-être son génie créateur. peut-être quelque chose d'autre. "</tag></item>
-    
+      <item>
+        Dis moi <ruleref special="GARBAGE" /> SARAH
+        <tag>out.action._attributes.dictation="true";</tag>
+      </item>
+      
     </one-of>
+    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/chatterbot";</tag>
   </rule>
 </grammar>

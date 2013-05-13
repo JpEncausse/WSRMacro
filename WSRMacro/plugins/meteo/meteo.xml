@@ -3,16 +3,16 @@
     <example>Sarah quelle est la météo pour demain ?</example>
     <tag>out.action=new Object(); </tag>
     
-    <item weight="2">Sarah</item>
+    <item>Sarah</item>
     
     <one-of>
       <item>quelle est la météo</item>
-      <item weight="1.2">quelle est le temps</item>
+      <item>quelle est le temps</item>
       <item>est-ce qu'il pleut</item>
       <item>comment dois-je m'habiller</item>
     </one-of>
 
-    <item repeat="0-1" weight="1.2">
+    <item repeat="0-1">
       <one-of>
         <item>aujourd'hui<tag>out.action.date="1";</tag></item>
         <item>en ce moment<tag>out.action.date="1";</tag></item>
@@ -33,6 +33,6 @@
       </one-of>
     </item>
     
-    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/phantom/meteo";</tag>
+    <tag>out.action._attributes.uri="http://127.0.0.1:8080/sarah/meteo";</tag>
   </rule> 
 </grammar>

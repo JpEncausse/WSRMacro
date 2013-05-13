@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Text;
+using System.Net;
 using System.Xml.XPath;
 using System.Globalization;
 using System.Collections.Generic;
@@ -8,17 +9,19 @@ using System.Diagnostics;
 using System.Windows.Forms;
 using CloudSpeech;
 using System.Web;
+using System.Text.RegularExpressions; 
 
-
+/*
 using System.Speech;
 using System.Speech.Recognition;
 using System.Speech.AudioFormat;
+*/
 
-/*
 using Microsoft.Speech;
 using Microsoft.Speech.Recognition;
-using Microsoft.Speech.AudioFormat; 
-*/
+using Microsoft.Speech.AudioFormat;
+
+
 
 
 namespace net.encausse.sarah {
@@ -62,6 +65,9 @@ namespace net.encausse.sarah {
         AddDirectoryWatcher(directory);
       }
 
+      // Watch Audio
+      InitAudioWatcher(WSRConfig.GetInstance().audioWatcher);
+
       // Start HttpServer
       WSRHttpManager.GetInstance().StartHttpServer();
     }
@@ -99,7 +105,7 @@ namespace net.encausse.sarah {
     protected String DIR_PATH = null;    // FIXME: Resolved absolute path
     protected bool reload = true;
 
-    protected void LoadGrammar() {
+    protected void LoadGrammar(SpeechRecognitionEngine sre) {
 
       if (!reload) {
         return;
@@ -110,7 +116,6 @@ namespace net.encausse.sarah {
 
       // Unload All Grammar
       logInfo("GRAMMAR", "Unload");
-      SpeechRecognitionEngine sre = GetEngine();
       sre.UnloadAllGrammars();
 
       // Iterate throught directories
@@ -119,7 +124,7 @@ namespace net.encausse.sarah {
         if (DIR_PATH == null) {
           DIR_PATH = dir.FullName;
         }
-        LoadGrammar(dir);
+        LoadGrammar(sre, dir);
       }
 
       // Add a Dictation Grammar (too bad)
@@ -132,26 +137,37 @@ namespace net.encausse.sarah {
       SetContext("default");
     }
 
-    protected void LoadGrammar(DirectoryInfo dir) {
+    protected void LoadGrammar(SpeechRecognitionEngine sre, DirectoryInfo dir) {
       logInfo("GRAMMAR", "Load directory: " + dir.FullName);
 
       // Load Grammar
       foreach (FileInfo f in dir.GetFiles("*.xml")) {
-        LoadGrammar(f.FullName, f.Name);
+        LoadGrammar(sre, f.FullName, f.Name);
       }
 
       // Recursive directory
       foreach (DirectoryInfo d in dir.GetDirectories()) {
-        LoadGrammar(d);
+        LoadGrammar(sre, d);
       }
-    } 
+    }
 
-    public void LoadGrammar(String file, String name) {
+    public void LoadGrammar(SpeechRecognitionEngine sre, String file, String name) {
 
       logInfo("GRAMMAR", "Load file: " + name + " : " + file);
 
-      // Create a Grammar from file
-      Grammar grammar = new Grammar(file);
+      // File to String
+      WSRConfig cfg = WSRConfig.GetInstance();
+      String xml = File.ReadAllText(file, Encoding.UTF8);
+      xml = Regex.Replace(xml, "([^/])SARAH", "$1" + cfg.name, RegexOptions.IgnoreCase);
+
+      // Create a Grammar from stream
+      Grammar grammar = null;
+      using (Stream s = StreamFromString(xml)) {
+        try { grammar = new Grammar(s); }
+        catch (Exception ex) { logInfo("GRAMMAR", "Error: " + name + ": " + ex.Message); return; }
+      }
+
+      // Setup grammar
       grammar.Enabled = file.IndexOf("lazy") < 0;
       if (grammar.RuleName != null) {
         grammar.Enabled = !grammar.RuleName.StartsWith("lazy");
@@ -159,7 +175,6 @@ namespace net.encausse.sarah {
       grammar.Name = name;
 
       // Load the grammar object into the recognizer.
-      SpeechRecognitionEngine sre = GetEngine();
       sre.LoadGrammar(grammar);
 
       // Add to context if there is no context
@@ -170,6 +185,16 @@ namespace net.encausse.sarah {
 
       // FIXME: unload grammar with same name ?
     }
+
+    protected Stream StreamFromString(string s) {
+      MemoryStream stream = new MemoryStream();
+      StreamWriter writer = new StreamWriter(stream);
+      writer.Write(s);
+      writer.Flush();
+      stream.Position = 0;
+      return stream;
+    }
+
 
     // ==========================================
     //  WSRMacro GRAMMAR CONTEXT
@@ -199,6 +224,31 @@ namespace net.encausse.sarah {
       }
     }
 
+    System.Timers.Timer ctxTimer = null;
+    public void SetContextTimeout() {
+      if (ctxTimer != null) { return; }
+      logInfo("CONTEXT", "Start context timeout: " + WSRConfig.GetInstance().ctxTimeout);
+      ctxTimer = new System.Timers.Timer();
+      ctxTimer.Interval = WSRConfig.GetInstance().ctxTimeout;
+      ctxTimer.Elapsed += new System.Timers.ElapsedEventHandler(timer_Elapsed);
+      ctxTimer.Enabled = true;
+      ctxTimer.Start();
+    }
+
+    protected void timer_Elapsed(object sender, EventArgs e) {
+      logInfo("CONTEXT", "End context timeout");
+      SetContext("default");
+      ctxTimer.Stop();
+      ctxTimer = null;
+    }
+
+    public void ResetContextTimeout() {
+      logInfo("CONTEXT", "Reset timeout");
+      if (ctxTimer == null) { return; }
+      ctxTimer.Stop();
+      ctxTimer.Start();
+    }
+    
     // ==========================================
     //  WSRMacro FILESYSTEM WATCHER
     // ==========================================
@@ -247,13 +297,49 @@ namespace net.encausse.sarah {
     }
 
     // ==========================================
+    //  WSRMacro ENGINE STANDALONE
+    // ==========================================
+
+    SpeechRecognitionEngine staticSRE = null;
+    public bool Recognize(string fileName) {
+      if (fileName == null) { return false; }
+      if (staticSRE == null) {
+        staticSRE = new SpeechRecognitionEngine(new System.Globalization.CultureInfo(WSRConfig.GetInstance().language));
+        staticSRE.SpeechRecognized += new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
+        staticSRE.MaxAlternates = 2;
+        LoadGrammar(staticSRE);
+      }
+      logInfo("ENGINE", "Recognize: " + fileName);
+      staticSRE.SetInputToWaveFile(fileName);
+      staticSRE.Recognize();
+      return true;
+    }
+
+    FileSystemWatcher audioWatcher = null;
+    protected void InitAudioWatcher(string directory) {
+      if (!Directory.Exists(directory)) { return; }
+      logInfo("ENGINE", "Init Audio Watcher: " + directory);
+      audioWatcher = new FileSystemWatcher();
+      audioWatcher.Path = directory;
+      audioWatcher.Filter = "*.wav";
+      audioWatcher.IncludeSubdirectories = true;
+      audioWatcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size;
+      audioWatcher.Changed += new FileSystemEventHandler(audio_Changed);
+      audioWatcher.EnableRaisingEvents = true;
+    }
+
+    protected void audio_Changed(object sender, FileSystemEventArgs e) {
+      Recognize(e.FullPath);
+    }
+
+    // ==========================================
     //  WSRMacro ENGINE
     // ==========================================
 
     protected SpeechRecognitionEngine recognizer = null;
     public virtual void StartRecognizer() {
       // Load grammar if needed
-      LoadGrammar();
+      LoadGrammar(GetEngine());
 
       // Start Recognizer
       logInfo("ENGINE", "Start listening");
@@ -304,7 +390,6 @@ namespace net.encausse.sarah {
     }
 
     protected void recognizer_SpeechHypothesized(object sender, SpeechHypothesizedEventArgs e) {}
-    
     protected void recognizer_RecognizeCompleted(object sender, RecognizeCompletedEventArgs e) {
       String resultText = e.Result != null ? e.Result.Text : "<null>";
       logInfo("ENGINE", "RecognizeCompleted (" + DateTime.Now.ToString("mm:ss.f") + "): " + resultText);
@@ -370,11 +455,14 @@ namespace net.encausse.sarah {
         return;
       }
 
+      // Reset context timeout
+      ResetContextTimeout();
+
       // 3 Hook
       String path = HandleCustomAttributes(xnav);
 
       // 4. Parse Result's URL
-      String url = GetURL(xnav);
+      String url = GetURL(xnav, rr.Confidence);
 
       // 5. Parse Result's Dication
       url = HandleWildcard(rr, url);
@@ -431,6 +519,7 @@ namespace net.encausse.sarah {
       XPathNavigator ctxt = xnav.SelectSingleNode("/SML/action/@context");
       if (ctxt != null) {
         SetContext(new List<string>(ctxt.Value.Split(',')));
+        SetContextTimeout();
       }
     }
 
@@ -527,7 +616,6 @@ namespace net.encausse.sarah {
     }
     */
 
-
     // ==========================================
     //  WSRMacro XPATH
     // ==========================================
@@ -541,15 +629,21 @@ namespace net.encausse.sarah {
       return WSRConfig.GetInstance().confidence;
     }
 
-    protected String GetURL(XPathNavigator xnav) {
+    protected String GetURL(XPathNavigator xnav, float confidence) {
       XPathNavigator xurl = xnav.SelectSingleNode("/SML/action/@uri");
       if (xurl == null) { return null; }
 
       // Build URI
-      String url = xurl.Value + "?";
+      String url = xurl.Value;
+
+      // Append ? and & for append params in URL
+      url += url.IndexOf("?") > 0 ? "&" : "?";
 
       // Build QueryString
       url += GetQueryString(xnav.Select("/SML/action/*"));
+
+      // Append Confidence
+      url += "confidence=" + confidence + "&";
 
       // Append Directory Path
       url += "directory=" + DIR_PATH;
@@ -583,7 +677,7 @@ namespace net.encausse.sarah {
     protected void HandlePlay(XPathNavigator xnav) {
       XPathNavigator play = xnav.SelectSingleNode("/SML/action/@play");
       if (play != null) {
-        WSRSpeaker.GetInstance().PlayMP3(play.Value); 
+        WSRSpeaker.GetInstance().Play(play.Value); 
       }
     }
 
@@ -670,13 +764,31 @@ namespace net.encausse.sarah {
       // Stop Music
       String pause = e.Request.Params.Get("pause");
       if (pause != null) {
-        WSRSpeaker.GetInstance().StopMP3(pause);
+        WSRSpeaker.GetInstance().Stop(pause);
       }
 
       // Play Music
       String mp3 = e.Request.Params.Get("play");
       if (mp3 != null) {
-        WSRSpeaker.GetInstance().PlayMP3(mp3);
+        WSRSpeaker.GetInstance().Play(mp3); 
+      }
+
+      // Recognize
+      String audio = e.Request.Params.Get("recognize");
+      if (audio != null) {
+        Recognize(audio);
+      }
+
+      // Recognize File
+      NHttp.HttpPostedFile file = e.Request.Files.Get("recognize");
+      if (file != null) {
+        byte[] data = null;
+        using (var reader = new BinaryReader(file.InputStream)) {
+          data = reader.ReadBytes(file.ContentLength);
+        }
+        var path = WSRConfig.GetInstance().audioWatcher+"/"+file.FileName;
+        if (File.Exists(path)) { File.Delete(path); }
+        File.WriteAllBytes(path, data);
       }
 
       // Text To Speech
@@ -690,6 +802,7 @@ namespace net.encausse.sarah {
       String ctxt = e.Request.Params.Get("context");
       if (ctxt != null) {
         SetContext(new List<string>(ctxt.Split(',')));
+        SetContextTimeout();
       }
 
       // Process
