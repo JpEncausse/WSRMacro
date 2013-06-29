@@ -54,7 +54,7 @@ namespace net.encausse.sarah {
     // ==========================================
 
     protected SpeechSynthesizer synthesizer = null;
-    public bool Speak(String tts) {
+    public bool Speak(String tts, bool async) {
 
       if (tts == null) { return false; }
 
@@ -64,12 +64,22 @@ namespace net.encausse.sarah {
       // Build and speak a prompt.
       PromptBuilder builder = new PromptBuilder();
       builder.AppendText(tts);
-      synthesizer.SpeakAsync(builder);
-
+      if (async) {
+        synthesizer.SpeakAsync(builder);
+      }
+      else {
+        synthesizer.Speak(builder);
+        speaking = false;
+      }
       return true;
     }
 
     protected void synthesizer_SpeakCompleted(object sender, SpeakCompletedEventArgs e) {
+      speaking = false;
+    }
+
+    public void ShutUp() {
+      synthesizer.Pause();
       speaking = false;
     }
 
@@ -93,7 +103,8 @@ namespace net.encausse.sarah {
         return Stream(fileName);
       }
 
-      bool wav = fileName.EndsWith(".wav");
+      var tmp = fileName.ToLower();
+      bool wav = tmp.EndsWith(".wav") || tmp.EndsWith(".wma");
 
       speaking = true;
       WSRConfig.GetInstance().logInfo("PLAYER", "Start MP3 Player");
@@ -122,7 +133,9 @@ namespace net.encausse.sarah {
 
       speaking = true;
       WSRConfig.GetInstance().logInfo("PLAYER", "Stream MP3 Player");
-      bool wav = url.EndsWith(".wav");
+
+      var tmp = url.ToLower();
+      bool wav = tmp.EndsWith(".wav") || tmp.EndsWith(".wma");
 
       using (var ms = new MemoryStream())
       using (var stream = WebRequest.Create(url).GetResponse().GetResponseStream()) {

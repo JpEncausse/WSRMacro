@@ -11,11 +11,6 @@ using System.Runtime.InteropServices;
 
 using Microsoft.Kinect;
 
-/*
- * FIXME:
- * - Balancer une requête quand reconnaissance ?
- */
-
 namespace net.encausse.sarah {
   
   public partial class WSRCamera : Window {
@@ -35,6 +30,7 @@ namespace net.encausse.sarah {
         camera.Closing += (sender2, e2) => { camera.Hide(); e2.Cancel = true; };
         System.Windows.Threading.Dispatcher.Run();
       });
+      thread.Name = "Camera";
       thread.SetApartmentState(ApartmentState.STA);
       thread.Start(); 
     }
@@ -94,13 +90,13 @@ namespace net.encausse.sarah {
     new public void Hide() {
       base.Hide();
       visible = false;
-      ((WSRKinectMacro) WSRMacro.GetInstance()).Sensor.ColorFrameReady -= this.SensorColorFrameReady;
+      ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).Sensor.ColorFrameReady -= this.SensorColorFrameReady;
     }
 
     new public void Show() {
       base.Show();
       visible = true;
-      ((WSRKinectMacro) WSRMacro.GetInstance()).Sensor.ColorFrameReady += this.SensorColorFrameReady;
+      ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).Sensor.ColorFrameReady += this.SensorColorFrameReady;
     }
 
     private void ButtonScreenshotClick(object sender, RoutedEventArgs e) {
@@ -114,11 +110,11 @@ namespace net.encausse.sarah {
 
     public void RecognizeFace(bool start) {
       if (start && !visible) {
-        ((WSRKinectMacro)WSRMacro.GetInstance()).Sensor.ColorFrameReady += this.SensorColorFrameReady;
+        ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).Sensor.ColorFrameReady += this.SensorColorFrameReady;
       }
 
       if (!start && !visible) {
-        ((WSRKinectMacro)WSRMacro.GetInstance()).Sensor.ColorFrameReady -= this.SensorColorFrameReady;
+        ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).Sensor.ColorFrameReady -= this.SensorColorFrameReady;
       }
     }
 
@@ -129,7 +125,7 @@ namespace net.encausse.sarah {
     private WriteableBitmap bitmap;
 
     private void InitColorBitmap() {
-      WSRKinectMacro wsr = (WSRKinectMacro) WSRMacro.GetInstance();
+      WSRKinect wsr = (WSRKinect)WSRConfig.GetInstance().GetWSRMicro();
 
       // This is the bitmap we'll display on-screen
       this.bitmap = wsr.NewColorBitmap();
@@ -139,7 +135,7 @@ namespace net.encausse.sarah {
     private void SensorColorFrameReady(object sender, ColorImageFrameReadyEventArgs e) {
 
       // Copy pixel array
-      ((WSRKinectMacro)WSRMacro.GetInstance()).UpdateColorBitmap(bitmap);
+      ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).UpdateColorBitmap(bitmap);
       
       // Update Detection
       WSRFaceRecognition.GetInstance().UpdateDetectionAsync(bitmap); 

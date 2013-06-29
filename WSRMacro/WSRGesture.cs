@@ -369,13 +369,18 @@ namespace net.encausse.sarah {
     public GestureManager() {}
 
     bool started = false;
+
     public void Recognize(bool start) {
+
+      KinectSensor sensor = ((WSRKinect) WSRConfig.GetInstance().GetWSRMicro()).Sensor;
       if (start && !started) {
-        ((WSRKinectMacro)WSRMacro.GetInstance()).Sensor.SkeletonFrameReady += SensorSkeletonFrameReady;
+        WSRConfig.GetInstance().logInfo("KINECT", "Starting Skeleton seated: " + WSRConfig.GetInstance().IsSeatedGesture());
+        sensor.SkeletonFrameReady += SensorSkeletonFrameReady;
         started = true;
       }
       else if (!start && started) {
-        ((WSRKinectMacro)WSRMacro.GetInstance()).Sensor.SkeletonFrameReady -= SensorSkeletonFrameReady;
+        WSRConfig.GetInstance().logInfo("KINECT", "Stoping Skeleton seated: " + WSRConfig.GetInstance().IsSeatedGesture());
+        sensor.SkeletonFrameReady -= SensorSkeletonFrameReady;
         started = false;
       }
     }
@@ -385,7 +390,7 @@ namespace net.encausse.sarah {
     // ------------------------------------------
 
     private void fireGesture(Gesture gesture) {
-      ((WSRKinectMacro)WSRMacro.GetInstance()).HandleGestureComplete(gesture);
+      ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).HandleGestureComplete(gesture);
     }
 
     // ------------------------------------------
@@ -398,7 +403,7 @@ namespace net.encausse.sarah {
     }
 
     public void LoadGestures(DirectoryInfo dir) {
-      WSRConfig.GetInstance().logInfo("GESTURE", "Load directory: " + dir.FullName);
+      WSRConfig.GetInstance().logDebug("GESTURE", "Load directory: " + dir.FullName);
 
       // Load Grammar
       foreach (FileInfo f in dir.GetFiles("*.gesture")) {
@@ -429,7 +434,7 @@ namespace net.encausse.sarah {
             if (reader.Name == "component" && gesture != null) {
               GestureComponent component = GestureComponent.Parse(reader);
               gesture.Components.Add(component);
-              WSRConfig.GetInstance().logInfo("GESTURE", "Component: " + component.Log(gesture.Description));
+              WSRConfig.GetInstance().logDebug("GESTURE", "Component: " + component.Log(gesture.Description));
             }
             break;
         }

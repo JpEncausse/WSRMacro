@@ -12,51 +12,77 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
 using Microsoft.Kinect;
+using System.Windows.Threading;
 
-/*
+#if MICRO
 using System.Speech.Recognition;
 using System.Speech.AudioFormat;
-*/
+#endif
 
+#if KINECT
 using Microsoft.Speech.Recognition;
 using Microsoft.Speech.AudioFormat;
+#endif
 
 namespace net.encausse.sarah {
 
-  public class WSRKinectMacro : WSRMacro {
-
-    new public static WSRMacro GetInstance() {
-      if (manager == null) {
-        manager = new WSRKinectMacro();
-        manager.Init();
-      }
-      return manager;
-    }
+  public class WSRKinect : WSRMicro {
 
     // ==========================================
-    //  WSRMacro CONSTRUCTOR
+    //  CONSTRUCTOR
     // ==========================================
 
     public override void Init() {
+      InitSensor();
       base.Init();
-      SetupSensor();
     }
 
     public override void Dispose() {
-      
+      // Stop super
+      base.Dispose();
+
       // Stop Thread
       WSRCamera.Shutdown();
 
       // Stop Sensor
-      logInfo("KINECT", "Stop sensor");
+      WSRConfig.GetInstance().logInfo("KINECT", "Stop sensor");
       if (Sensor != null) {  Sensor.Stop(); }
-
-      // Stop super
-      base.Dispose();
     }
 
     // ==========================================
-    //  WSRMacro SYSTEM TRAY
+    //  KINECT INIT SENSOR
+    // ==========================================
+
+    public KinectSensor Sensor { get; set; }
+    protected void InitSensor() {
+      // Looking for a valid sensor 
+      foreach (var potentialSensor in KinectSensor.KinectSensors) {
+        if (potentialSensor.Status == KinectStatus.Connected) {
+          Sensor = potentialSensor;
+          break;
+        }
+      }
+
+      // Abort if there is no sensor available
+      if (null == Sensor) {
+        WSRConfig.GetInstance().logInfo("KINECT", "No Kinect Sensor");
+        return;
+      }
+
+      // Use Skeleton Engine
+      SetupSkeletonFrame(Sensor);
+
+      // Use Color Engine
+      SetupColorFrame(Sensor);
+
+      // Starting the sensor
+      try { Sensor.Start(); }
+      catch (IOException) { Sensor = null; return; } // Some other application is streaming from the same Kinect sensor
+      
+    }
+
+    // ==========================================
+    //  HANDLE SYSTEM TRAY
     // ==========================================
 
     public override void HandleCtxMenu(ContextMenuStrip menu) {
@@ -78,61 +104,7 @@ namespace net.encausse.sarah {
     }
 
     // ==========================================
-    //  KINECT GESTURE
-    // ==========================================
-    GestureManager gestureMgr = null;
-    public void SetupSkeletonFrame(KinectSensor sensor) {
-
-      if (!WSRConfig.GetInstance().IsGestureMode()) {
-        return;
-      }
-
-      // Build Gesture Manager
-      gestureMgr = new GestureManager();
-
-      // Load Gestures from directories
-      foreach (string directory in WSRConfig.GetInstance().directories) {
-        DirectoryInfo d = new DirectoryInfo(directory);
-        gestureMgr.LoadGestures(d);
-      }
-
-      // Plugin in Kinect Sensor
-      if (WSRConfig.GetInstance().IsSeatedGesture()) {
-        sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Seated;
-      }
-
-      logInfo("KINECT", "Starting Skeleton seated: " + WSRConfig.GetInstance().IsSeatedGesture());
-      sensor.SkeletonStream.Enable();
-    }
-
-    public void HandleGestureComplete(Gesture gesture) {
-      WSRHttpManager.GetInstance().SendRequest(gesture.Url);
-    }
-
-    // ==========================================
-    //  WSRMacro SPEECH RECOGNITION
-    // ==========================================
-
-    protected override String HandleCustomAttributes(XPathNavigator xnav) {
-      String path = base.HandleCustomAttributes(xnav);
-
-      // 3.3 Parse Result's Photo
-      path = HandlePicture(xnav, path);
-
-      return path;
-    }
-
-    protected String HandlePicture(XPathNavigator xnav, String path) {
-      XPathNavigator picture = xnav.SelectSingleNode("/SML/action/@picture");
-      if (picture != null) {
-        path = TakePicture("medias/");
-      }
-
-      return path;
-    }
-
-    // ==========================================
-    //  WSRMacro REQUEST
+    //  HANDLE HTTPSERVER
     // ==========================================
 
     public override bool HandleCustomRequest(NHttp.HttpRequestEventArgs e) {
@@ -180,7 +152,113 @@ namespace net.encausse.sarah {
       }
 
       return false;
-    } 
+    }
+
+    // ==========================================
+    //  HANDLE SPEECH RECOGNITION
+    // ==========================================
+
+    public override String HandleCustomAttributes(XPathNavigator xnav) {
+      String path = base.HandleCustomAttributes(xnav);
+
+      // 3.3 Parse Result's Photo
+      path = HandlePicture(xnav, path);
+
+      return path;
+    }
+
+    protected String HandlePicture(XPathNavigator xnav, String path) {
+      XPathNavigator picture = xnav.SelectSingleNode("/SML/action/@picture");
+      if (picture != null) {
+        path = TakePicture("medias/");
+      }
+
+      return path;
+    }
+
+    // ==========================================
+    //  KINECT AUDIO
+    // ==========================================
+
+    public override String GetDeviceInfo() {
+      if (null == Sensor) { return ""; }
+      KinectAudioSource source = Sensor.AudioSource;
+      if (source == null) { return ""; }
+      return "BeamAngle : " + source.BeamAngle + " "
+           + "SourceAngle : " + source.SoundSourceAngle + " "
+           + "SourceConfidence : " + source.SoundSourceAngleConfidence;
+    }
+
+    public override void SetupAudioEngine(WSRSpeechEngine engine) {
+
+      // Abort if there is no sensor available
+      if (null == Sensor) {
+        WSRConfig.GetInstance().logInfo("KINECT", "No Kinect Sensor");
+        base.SetupAudioEngine(engine);
+      }
+
+      SetupAudioSource(Sensor, engine.GetEngine());
+      WSRConfig.GetInstance().logInfo("KINECT", "Using Kinect Sensors !");
+    }
+
+    private SpeechStreamer streamer = null;
+    protected Boolean SetupAudioSource(KinectSensor sensor, SpeechRecognitionEngine sre) {
+      WSRConfig cfg = WSRConfig.GetInstance();
+      if (!sensor.IsRunning) {
+        cfg.logInfo("KINECT", "Sensor is not running");
+        return false;
+      }
+
+      // Use Audio Source to Engine
+      KinectAudioSource source = sensor.AudioSource;
+      source.EchoCancellationMode = EchoCancellationMode.CancellationAndSuppression;
+      source.NoiseSuppression = true;
+      source.BeamAngleMode = BeamAngleMode.Adaptive; //set the beam to adapt to the surrounding
+
+      cfg.logInfo("KINECT", "AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
+      cfg.logInfo("KINECT", "BeamAngle : " + source.BeamAngle);
+      cfg.logInfo("KINECT", "EchoCancellationMode : " + source.EchoCancellationMode);
+      cfg.logInfo("KINECT", "EchoCancellationSpeakerIndex : " + source.EchoCancellationSpeakerIndex);
+      cfg.logInfo("KINECT", "NoiseSuppression : " + source.NoiseSuppression);
+      cfg.logInfo("KINECT", "SoundSourceAngle : " + source.SoundSourceAngle);
+      cfg.logInfo("KINECT", "SoundSourceAngleConfidence : " + source.SoundSourceAngleConfidence);
+
+      var stream = source.Start();
+      streamer = new SpeechStreamer(stream);
+      sre.SetInputToAudioStream(streamer, new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
+      return true;
+    }
+
+    // ==========================================
+    //  KINECT GESTURE
+    // ==========================================
+
+    GestureManager gestureMgr = null;
+    public void SetupSkeletonFrame(KinectSensor sensor) {
+
+      if (!WSRConfig.GetInstance().IsGestureMode()) {
+        return;
+      }
+
+      // Build Gesture Manager
+      gestureMgr = new GestureManager();
+
+      // Load Gestures from directories
+      foreach (string directory in WSRConfig.GetInstance().directories) {
+        DirectoryInfo d = new DirectoryInfo(directory);
+        gestureMgr.LoadGestures(d);
+      }
+
+      // Plugin in Kinect Sensor
+      if (WSRConfig.GetInstance().IsSeatedGesture()) {
+        sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Seated;
+      }
+      sensor.SkeletonStream.Enable();
+    }
+
+    public void HandleGestureComplete(Gesture gesture) {
+      WSRHttpManager.GetInstance().SendRequest(gesture.Url);
+    }
 
     // ==========================================
     //  KINECT COLOR FRAME
@@ -192,36 +270,44 @@ namespace net.encausse.sarah {
 
     public void SetupColorFrame(KinectSensor sensor) {
 
-      logInfo("KINECT", "Starting Color sensor");
-
-      // Turn on the color stream to receive color frames
-      // sensor.ColorStream.Enable(ColorImageFormat.RgbResolution1280x960Fps12);
-      sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
-
-      ColorW = sensor.ColorStream.FrameWidth;
-      ColorH = sensor.ColorStream.FrameHeight;
-
-      // Allocate space to put the pixels we'll receive
-      ColorPixels = new byte[sensor.ColorStream.FramePixelDataLength];
-
-      // Init Common ----------
-      sensor.ColorFrameReady += new EventHandler<ColorImageFrameReadyEventArgs>(handle_ColorFrameReady);
+      // Enable All ?
+      bool enable = WSRConfig.GetInstance().IsPictureMode();
 
       // Init QRCode ----------
       QRCodeManager qrmgr = new QRCodeManager();
       if (qrmgr.SetupQRCode()) {
+        enable = true;
         sensor.ColorFrameReady += qrmgr.SensorColorFrameReady;
       }
 
       // Init WebSocket ----------
       WebSocketManager wsmgr = new WebSocketManager();
       if (wsmgr.SetupWebSocket()) {
+        enable = true;
         wsmgr.SetupGreenScreen(sensor);
       }
 
       // Init WSRCamera ----------
       if (WSRConfig.GetInstance().facetrack > 0) {
+        enable = true;
         WSRCamera.Start();
+      }
+
+      if (enable) {
+        WSRConfig.GetInstance().logInfo("KINECT", "Starting Color sensor");
+
+        // Turn on the color stream to receive color frames
+        // sensor.ColorStream.Enable(ColorImageFormat.RgbResolution1280x960Fps12);
+        sensor.ColorStream.Enable(ColorImageFormat.RgbResolution640x480Fps30);
+
+        ColorW = sensor.ColorStream.FrameWidth;
+        ColorH = sensor.ColorStream.FrameHeight;
+
+        // Allocate space to put the pixels we'll receive
+        ColorPixels = new byte[sensor.ColorStream.FramePixelDataLength];
+
+        // Init Common ----------
+        sensor.ColorFrameReady += new EventHandler<ColorImageFrameReadyEventArgs>(handle_ColorFrameReady);
       }
     }
 
@@ -252,7 +338,7 @@ namespace net.encausse.sarah {
         WSRHttpManager.GetInstance().SendRequest(match);
       }
       else {
-        WSRSpeaker.GetInstance().Speak(match);
+        WSRSpeaker.GetInstance().Speak(match, true);
       }
       return true;
     }
@@ -286,7 +372,7 @@ namespace net.encausse.sarah {
       }
       image.Dispose();
 
-      logInfo("PICTURE", "New picture to: " + path);
+      WSRConfig.GetInstance().logInfo("PICTURE", "New picture to: " + path);
       return path;
     }
 
@@ -347,109 +433,5 @@ namespace net.encausse.sarah {
       image.RotateFlip(RotateFlipType.RotateNoneFlipX);
       return image;
     }
-
-    // ==========================================
-    //  KINECT AUDIO
-    // ==========================================
-
-    public override Boolean SetupDevice(SpeechRecognitionEngine sre) {
-
-      // Abort if there is no sensor available
-      if (null == Sensor) {
-        logInfo("KINECT", "No Kinect Sensor");
-        return false;
-      }
-
-      SetupAudioSource(Sensor, sre);
-
-      logInfo("KINECT", "Using Kinect Sensors !"); 
-      return true;
-    }
-
-
-    protected Boolean SetupAudioSource(KinectSensor sensor, SpeechRecognitionEngine sre) {
-      if (!sensor.IsRunning) {
-        logInfo("KINECT", "Sensor is not running"); 
-        return false;
-      }
-      
-      // Use Audio Source to Engine
-      KinectAudioSource source = sensor.AudioSource;
-      source.EchoCancellationMode = EchoCancellationMode.CancellationAndSuppression;
-      source.NoiseSuppression = true;
-      source.BeamAngleMode = BeamAngleMode.Adaptive; //set the beam to adapt to the surrounding
-
-      WSRConfig.GetInstance().logDebug("KINECT", "AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
-      WSRConfig.GetInstance().logDebug("KINECT", "BeamAngle : " + source.BeamAngle);
-      WSRConfig.GetInstance().logDebug("KINECT", "EchoCancellationMode : " + source.EchoCancellationMode);
-      WSRConfig.GetInstance().logDebug("KINECT", "EchoCancellationSpeakerIndex : " + source.EchoCancellationSpeakerIndex);
-      WSRConfig.GetInstance().logDebug("KINECT", "NoiseSuppression : " + source.NoiseSuppression);
-      WSRConfig.GetInstance().logDebug("KINECT", "SoundSourceAngle : " + source.SoundSourceAngle);
-      WSRConfig.GetInstance().logDebug("KINECT", "SoundSourceAngleConfidence : " + source.SoundSourceAngleConfidence);
-
-      sre.SetInputToAudioStream(source.Start(), new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
-      return true;
-    }
-
-    protected override String GetDeviceConfidence() {
-      if (null == Sensor) { return ""; }
-      KinectAudioSource source = Sensor.AudioSource;
-      if (source == null) { return ""; }
-      return "BeamAngle : " + source.BeamAngle + " "
-           + "SourceAngle : " + source.SoundSourceAngle + " "
-           + "SourceConfidence : " + source.SoundSourceAngleConfidence;
-    }
-
-    // ==========================================
-    //  KINECT STATRT/STOP
-    // ==========================================
-
-    public KinectSensor Sensor { get; set; }
-    protected void SetupSensor() {
-      // Looking for a valid sensor 
-      foreach (var potentialSensor in KinectSensor.KinectSensors) {
-        if (potentialSensor.Status == KinectStatus.Connected) {
-          Sensor = potentialSensor;
-          break;
-        }
-      }
-
-      // Abort if there is no sensor available
-      if (null == Sensor) {
-        logInfo("KINECT", "No Kinect Sensor");
-        return;
-      }
-
-      // Use Skeleton Engine
-      SetupSkeletonFrame(Sensor);
-
-      // Use Color Engine
-      SetupColorFrame(Sensor);
-
-      // Starting the sensor                   
-      try { Sensor.Start(); }
-      catch (IOException) { Sensor = null; return; } // Some other application is streaming from the same Kinect sensor
-    }
-
-    /*
-    public override void StopRecognizer() { 
-      base.StopRecognizer();
-      logInfo("KINECT", "Stop sensor"); 
-      if (Sensor != null) {
-        Sensor.Stop();
-      }
-      logInfo("KINECT", "Stop sensor...done");
-    }
-    
-    public override void StartRecognizer() {
-      logInfo("KINECT", "Start sensor"); 
-      if (sensor != null) {
-        sensor.Start();
-        SetupAudioSource(sensor, GetEngine()); 
-      }
-      logInfo("KINECT", "Start sensor...done");
-      base.StartRecognizer();
-    }
-    */
   }
 }

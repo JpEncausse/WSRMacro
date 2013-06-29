@@ -39,7 +39,7 @@ namespace net.encausse.sarah {
       try {
         HttpWebResponse res = (HttpWebResponse)req.GetResponse();
         using (StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8)) {
-          WSRSpeaker.GetInstance().Speak(sr.ReadToEnd());
+          WSRSpeaker.GetInstance().Speak(sr.ReadToEnd(), true);
         }
       }
       catch (WebException ex) {
@@ -60,7 +60,7 @@ namespace net.encausse.sarah {
       try {
         byte[] responseArray = client.UploadFile(url, path);
         String response = System.Text.Encoding.ASCII.GetString(responseArray);
-        WSRSpeaker.GetInstance().Speak(response);
+        WSRSpeaker.GetInstance().Speak(response, true);
       }
       catch (Exception ex) {
         WSRConfig.GetInstance().logInfo("HTTP", "Exception: " + ex.Message);
@@ -98,6 +98,18 @@ namespace net.encausse.sarah {
       WSRConfig.GetInstance().logInfo("INIT", "Starting Server: http://" + httpLocal.EndPoint + "/");
     }
 
+    public void Dispose() {
+      if (http != null) {
+        http.Stop();
+        http.Dispose();
+      }
+
+      if (httpLocal != null) {
+        httpLocal.Stop();
+        httpLocal.Dispose();
+      }
+    }
+
     protected IPAddress GetIpAddress() {
       IPHostEntry host = Dns.GetHostEntry(Dns.GetHostName());
       foreach (IPAddress ip in host.AddressList) {
@@ -112,7 +124,7 @@ namespace net.encausse.sarah {
       WSRConfig.GetInstance().logInfo("HTTP", "Request received: " + e.Request.Url.AbsoluteUri);
 
       // Handle custom request
-      WSRMacro.GetInstance().HandleCustomRequest(e);
+      WSRConfig.GetInstance().GetWSRMicro().HandleCustomRequest(e);
       
       // Fake response
       using (var writer = new StreamWriter(e.Response.OutputStream)) {

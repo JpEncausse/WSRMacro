@@ -41,6 +41,9 @@ namespace net.encausse.sarah {
     // Httpserver port
     public int loopback = 8088;
     
+    // RTPPort
+    public int rtpport = 7887;
+
     bool gesture = false;
     bool seated  = false;
     bool picture = false;
@@ -57,7 +60,8 @@ namespace net.encausse.sarah {
     public string websocktype = "png";
 
     // Internal
-    bool kinect = false; 
+    bool kinect = false;
+    WSRMicro wsr = null;
 
     // ==========================================
     //  CONSTRUCTOR
@@ -78,6 +82,7 @@ namespace net.encausse.sarah {
         { "c|confidence=", "the Grammar {CONFIDENCE}. (default is 0.75)", v => confidence = double.Parse(v, culture) },
         { "dictation=", "the Grammar {CONFIDENCE} for dictation. (default is 0.40)", v => dictation = double.Parse(v, culture) },
         { "l|loopback=", "the local {PORT}. (default is 8088)", v => loopback = int.Parse(v, culture) },
+        { "rtp=", "the rtp {PORT}. (default is 7887)", v => rtpport = int.Parse(v, culture) },
         { "language",  "the recognition engine {LANGUAGE}", v => language = v },
         { "debug",  "display more debug data", v => DEBUG = v != null },
 
@@ -102,6 +107,26 @@ namespace net.encausse.sarah {
         config = new WSRConfig();
       }
       return config;
+    }
+
+    // ==========================================
+    //  MICRO or KINECT
+    // ==========================================
+
+    public void SetupMicro(){
+      logInfo("INIT", "==========================================");
+      logInfo("INIT", "S.A.R.A.H.");
+      logInfo("INIT", "==========================================");
+      logInfo("INIT", "Server: " + GetRemoteURL());
+      logInfo("INIT", "Confidence: " + confidence);
+      logInfo("INIT", "==========================================");
+
+      wsr = config.IsKinect() ? new WSRKinect() : new WSRMicro();
+      wsr.Init();
+    }
+
+    public WSRMicro GetWSRMicro() {
+      return wsr;
     }
 
     // ==========================================
@@ -149,6 +174,7 @@ namespace net.encausse.sarah {
           else if (property.Key == "dictation")  { dictation = double.Parse(property.Value, culture); }
           else if (property.Key == "adaptation") { adaptation = bool.Parse(property.Value); }
           else if (property.Key == "loopback")   { loopback = int.Parse(property.Value, culture); }
+          else if (property.Key == "rtpport")    { rtpport = int.Parse(property.Value, culture); }
           else if (property.Key == "language")   { language = property.Value;  }
           else if (property.Key == "voice")      { voice = property.Value; }
           else if (property.Key == "debug")      { DEBUG = bool.Parse(property.Value); }
@@ -255,16 +281,17 @@ namespace net.encausse.sarah {
       fileTarget.FileName = "${basedir}/${shortdate}.log";
       fileTarget.Layout = "${message}";
 
-      var sentinalTarget = new NLogViewerTarget() {
-        Name = "sentinal",
+      var viewerTarget = new NLogViewerTarget() {
+        Name = "viewer",
         Address = "udp://127.0.0.1:9999"
       };
+      viewerTarget.Layout = "${logger} ${message}";
 
       // Add Targets ----------
 
       config.AddTarget("console", consoleTarget);
       config.AddTarget("file", fileTarget);
-      config.AddTarget("sentinal", sentinalTarget);
+      config.AddTarget("viewer", viewerTarget);
 
       // Add Rules ----------
 
@@ -274,11 +301,12 @@ namespace net.encausse.sarah {
       LoggingRule rule2 = new LoggingRule("*", LogLevel.Debug, fileTarget);
       config.LoggingRules.Add(rule2);
 
-      LoggingRule rule3 = new LoggingRule("*", LogLevel.Debug, sentinalTarget);
+      LoggingRule rule3 = new LoggingRule("*", LogLevel.Debug, viewerTarget);
       config.LoggingRules.Add(rule3);
 
+      LogManager.ReconfigExistingLoggers();
       LogManager.Configuration = config;
-    
+      logInfo("LOGGING", "STARTING LOGGING");
     }
 
     public void logInfo(String context, String msg) {
@@ -291,7 +319,10 @@ namespace net.encausse.sarah {
       Logger logger = LogManager.GetLogger("SARAH");
       logger.Debug("[{0}] [{1}]\t {2}", DateTime.Now.ToString("yyyy:MM:dd HH:mm:ss"), context, msg);
     }
-
+    public void logError(String context, String msg) {
+      Logger logger = LogManager.GetLogger("SARAH"); 
+      logger.Error("[{0}] [{1}]\t {2}", DateTime.Now.ToString("yyyy:MM:dd HH:mm:ss"), context, msg);
+    }
     public void logError(String context, Exception ex) {
       Logger logger = LogManager.GetLogger("SARAH");
       logger.Error("[{0}] [{1}]\t {2}", DateTime.Now.ToString("yyyy:MM:dd HH:mm:ss"), context, ex);

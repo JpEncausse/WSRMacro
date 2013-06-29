@@ -111,7 +111,7 @@ namespace net.encausse.sarah {
 
         // Send match
         var matches = new List<String>(cachedResults.Values);
-        ((WSRKinectMacro)WSRMacro.GetInstance()).HandleFaceComplete(matches);
+        ((WSRKinect) WSRConfig.GetInstance().GetWSRMicro()).HandleFaceComplete(matches);
       }
 
       // Update cache

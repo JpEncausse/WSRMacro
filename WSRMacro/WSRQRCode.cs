@@ -26,7 +26,7 @@ namespace net.encausse.sarah {
     private WriteableBitmap bitmap;
 
     private void fireQRCode(String match) {
-      ((WSRKinectMacro)WSRMacro.GetInstance()).HandleQRCodeComplete(match);
+      ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).HandleQRCodeComplete(match);
     }
 
     public bool SetupQRCode() {
@@ -45,7 +45,7 @@ namespace net.encausse.sarah {
     public void SensorColorFrameReady(object sender, ColorImageFrameReadyEventArgs e) {
 
       if (bitmap == null) {
-        bitmap = ((WSRKinectMacro)WSRMacro.GetInstance()).NewColorBitmap();
+        bitmap = ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).NewColorBitmap();
       }
 
       CheckQRCode();
@@ -56,7 +56,7 @@ namespace net.encausse.sarah {
       if (threshold-- > 0) { return; } threshold = WSRConfig.GetInstance().qrcode;
       if (image != null) { return; }
 
-      image = ((WSRKinectMacro)WSRMacro.GetInstance()).GetColorPNG(bitmap, true);
+      image = ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).GetColorPNG(bitmap, true);
       Task.Factory.StartNew(() => {
         CheckQRCodeAsync(image);
         image.Dispose();

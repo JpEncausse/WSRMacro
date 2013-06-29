@@ -14,18 +14,12 @@ namespace net.encausse.sarah {
         return;
       }
 
-      // Setup logging
-      config.SetupLogging();
-
       try {
+        // Setup logging
+        config.SetupLogging();
 
-        // Buid WSRMacro
-        WSRMacro wsr = config.IsKinect()
-                     ? WSRKinectMacro.GetInstance()
-                     : WSRMacro.GetInstance();
-
-        // Start Recognizer
-        wsr.StartRecognizer();
+        // Buid WSRMicro or Kinect
+        config.SetupMicro();
 
         // Start Process
         Application.EnableVisualStyles();

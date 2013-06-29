@@ -129,7 +129,7 @@ namespace net.encausse.sarah {
         HandleColor();
       }
 
-      WSRKinectMacro wsr = (WSRKinectMacro) WSRMacro.GetInstance();
+      WSRKinect wsr = (WSRKinect)WSRConfig.GetInstance().GetWSRMicro();
       WriteableBitmap resize = colorBitmap.Resize(320, 240, WriteableBitmapExtensions.Interpolation.Bilinear);
       Bitmap image = wsr.GetColorPNG(resize, false);
       MemoryStream ms = new MemoryStream();
@@ -146,7 +146,7 @@ namespace net.encausse.sarah {
     }
 
     private void HandleDepth() {
-      KinectSensor sensor = ((WSRKinectMacro)WSRKinectMacro.GetInstance()).Sensor;
+      KinectSensor sensor = ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).Sensor;
       sensor.CoordinateMapper.MapDepthFrameToColorFrame(
                     DepthImageFormat.Resolution640x480Fps30, depthPixels,
                     ColorImageFormat.RgbResolution640x480Fps30, colorCoordinates);
@@ -197,7 +197,7 @@ namespace net.encausse.sarah {
     private System.Windows.Point maskPoint;
  
     private void HandleColor() {
-      WSRKinectMacro wsr = (WSRKinectMacro)WSRKinectMacro.GetInstance();
+      WSRKinect wsr = (WSRKinect) WSRConfig.GetInstance().GetWSRMicro();
 
       if (colorBitmap == null) {
         colorBitmap = wsr.NewColorBitmap();

@@ -19,6 +19,7 @@ packages/
 WSRMacro/dump
 WSRMacro/medias/Kinect*
 WSRMacro/Camera/TrainedFaces
+WSRMacro/plugins
 
 # External tool builders
 .externalToolBuilders/
