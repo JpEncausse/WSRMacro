@@ -11,8 +11,8 @@ using System.Windows.Media.Imaging;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Windows.Forms;
-using Microsoft.Kinect;
 using System.Windows.Threading;
+using Microsoft.Kinect;
 
 #if MICRO
 using System.Speech.Recognition;
@@ -24,7 +24,7 @@ using Microsoft.Speech.Recognition;
 using Microsoft.Speech.AudioFormat;
 #endif
 
-namespace net.encausse.sarah {
+namespace net.encausse.sarah { 
 
   public class WSRKinect : WSRMicro {
 
@@ -65,19 +65,28 @@ namespace net.encausse.sarah {
 
       // Abort if there is no sensor available
       if (null == Sensor) {
-        WSRConfig.GetInstance().logInfo("KINECT", "No Kinect Sensor");
+        WSRConfig.GetInstance().logError("KINECT", "No Kinect Sensor");
         return;
       }
 
       // Use Skeleton Engine
-      SetupSkeletonFrame(Sensor);
+      try { SetupSkeletonFrame(Sensor); } 
+      catch(Exception ex){
+        WSRConfig.GetInstance().logError("KINECT", "Can't setup skeleton frame: "+ex.Message);
+      }
 
       // Use Color Engine
-      SetupColorFrame(Sensor);
+      try { SetupColorFrame(Sensor); }
+      catch (Exception ex) {
+        WSRConfig.GetInstance().logError("KINECT", "Can't setup color frame: " + ex.Message);
+      }
 
       // Starting the sensor
       try { Sensor.Start(); }
-      catch (IOException) { Sensor = null; return; } // Some other application is streaming from the same Kinect sensor
+      catch (IOException) {
+        WSRConfig.GetInstance().logError("KINECT", "No Kinect Sensor: already used");
+        Sensor = null;  return; // Some other application is streaming from the same Kinect sensor
+      } 
       
     }
 
@@ -195,6 +204,7 @@ namespace net.encausse.sarah {
       if (null == Sensor) {
         WSRConfig.GetInstance().logInfo("KINECT", "No Kinect Sensor");
         base.SetupAudioEngine(engine);
+        return;
       }
 
       SetupAudioSource(Sensor, engine.GetEngine());
@@ -210,11 +220,13 @@ namespace net.encausse.sarah {
       }
 
       // Use Audio Source to Engine
-      KinectAudioSource source = sensor.AudioSource;
+      KinectAudioSource source = sensor.AudioSource; 
       source.EchoCancellationMode = EchoCancellationMode.CancellationAndSuppression;
       source.NoiseSuppression = true;
       source.BeamAngleMode = BeamAngleMode.Adaptive; //set the beam to adapt to the surrounding
+      source.AutomaticGainControlEnabled = false;
 
+      cfg.logInfo("ENGINE", "Audio Level: " + sre.AudioLevel);
       cfg.logInfo("KINECT", "AutomaticGainControlEnabled : " + source.AutomaticGainControlEnabled);
       cfg.logInfo("KINECT", "BeamAngle : " + source.BeamAngle);
       cfg.logInfo("KINECT", "EchoCancellationMode : " + source.EchoCancellationMode);
@@ -225,7 +237,7 @@ namespace net.encausse.sarah {
 
       var stream = source.Start();
       streamer = new SpeechStreamer(stream);
-      sre.SetInputToAudioStream(streamer, new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
+      sre.SetInputToAudioStream(stream, new SpeechAudioFormatInfo(EncodingFormat.Pcm, 16000, 16, 1, 32000, 2, null));
       return true;
     }
 

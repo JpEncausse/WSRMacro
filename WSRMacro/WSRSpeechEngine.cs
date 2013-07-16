@@ -33,43 +33,43 @@ namespace net.encausse.sarah {
     //  CONSTRUCTOR
     // ==========================================
 
-    public WSRSpeechEngine(String name, double confidence) {
+    public WSRSpeechEngine(String name, String language, double confidence) {
       this.Name = name;
       this.Confidence = confidence;
       this.cfg = WSRConfig.GetInstance();
+      this.engine = new SpeechRecognitionEngine(new System.Globalization.CultureInfo(language));
     }
 
-    public void Init(String language) {
+    public void Init() {
 
-      cfg.logInfo("ENGINE", Name + ": Init recognizer: " + language);
-
-      engine = new SpeechRecognitionEngine(new System.Globalization.CultureInfo(language));
-      engine.SpeechRecognized += new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
+      cfg.logInfo("ENGINE - " + Name, "Init recognizer");
+      
+      engine.SpeechRecognized   += new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
       engine.RecognizeCompleted += new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
-      engine.AudioStateChanged += new EventHandler<AudioStateChangedEventArgs>(recognizer_AudioStateChanged);
+      engine.AudioStateChanged  += new EventHandler<AudioStateChangedEventArgs>(recognizer_AudioStateChanged);
       engine.SpeechHypothesized += new EventHandler<SpeechHypothesizedEventArgs>(recognizer_SpeechHypothesized);
-      engine.SpeechDetected += new EventHandler<SpeechDetectedEventArgs>(recognizer_SpeechDetected);
+      engine.SpeechDetected     += new EventHandler<SpeechDetectedEventArgs>(recognizer_SpeechDetected);
 
       engine.MaxAlternates = 2;
       // engine.InitialSilenceTimeout = TimeSpan.FromSeconds(3);
       // engine.BabbleTimeout = TimeSpan.FromSeconds(2);
       // engine.EndSilenceTimeout = TimeSpan.FromSeconds(1);
       // engine.EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(1.5);
-
+      
       if (!cfg.adaptation) {
         engine.UpdateRecognizerSetting("AdaptationOn", 0);
       }
 
-      cfg.logDebug("ENGINE", Name + ": MaxAlternates: " + engine.MaxAlternates);
-      cfg.logDebug("ENGINE", Name + ": BabbleTimeout: " + engine.BabbleTimeout);
-      cfg.logDebug("ENGINE", Name + ": InitialSilenceTimeout: " + engine.InitialSilenceTimeout);
-      cfg.logDebug("ENGINE", Name + ": EndSilenceTimeout: " + engine.EndSilenceTimeout);
-      cfg.logDebug("ENGINE", Name + ": EndSilenceTimeoutAmbiguous: " + engine.EndSilenceTimeoutAmbiguous);
+      cfg.logDebug("ENGINE - " + Name, "MaxAlternates: " + engine.MaxAlternates);
+      cfg.logDebug("ENGINE - " + Name, "BabbleTimeout: " + engine.BabbleTimeout);
+      cfg.logDebug("ENGINE - " + Name, "InitialSilenceTimeout: " + engine.InitialSilenceTimeout);
+      cfg.logDebug("ENGINE - " + Name, "EndSilenceTimeout: " + engine.EndSilenceTimeout);
+      cfg.logDebug("ENGINE - " + Name, "EndSilenceTimeoutAmbiguous: " + engine.EndSilenceTimeoutAmbiguous);
     }
 
     public void LoadGrammar() {
-      cfg.logInfo("GRAMMAR", Name + ":Load Grammar to Engine");
-      WSRSpeech.GetInstance().LoadGrammar(engine);
+      cfg.logInfo("GRAMMAR", Name + ": Load Grammar to Engine");
+      WSRSpeech.GetInstance().LoadGrammar(this);
     }
 
     // ==========================================
@@ -89,7 +89,7 @@ namespace net.encausse.sarah {
 
       // 1. Prevent while speaking
       if (WSRSpeaker.GetInstance().IsSpeaking()) {
-        cfg.logInfo("ENGINE", "REJECTED Speech while speaking: " + rr.Confidence + " Text: " + rr.Text);
+        cfg.logWarning("ENGINE - " + Name, "REJECTED Speech while speaking: " + rr.Confidence + " Text: " + rr.Text);
         return;
       }
 
@@ -157,7 +157,7 @@ namespace net.encausse.sarah {
     protected double GetConfidence(XPathNavigator xnav) {
       XPathNavigator level = xnav.SelectSingleNode("/SML/action/@threashold");
       if (level != null) {
-        cfg.logInfo("HTTP", "Using confidence level: " + level.Value);
+        cfg.logInfo("HTTP - " + Name, "Using confidence level: " + level.Value);
         return level.ValueAsDouble;
       }
       return Confidence;
@@ -168,17 +168,17 @@ namespace net.encausse.sarah {
 
       double confidence = GetConfidence(xnav);
       if (rr.Confidence < confidence) {
-        cfg.logInfo("ENGINE", "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Device: " + WSRSpeech.GetInstance().GetDeviceInfo(this) + " Text: " + rr.Text);
+        cfg.logWarning("ENGINE - "+Name, "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Device: " + WSRSpeech.GetInstance().GetDeviceInfo(this) + " Text: " + rr.Text);
         return null;
       }
 
       if (rr.Words[0].Confidence < cfg.trigger) {
-        cfg.logInfo("ENGINE", "REJECTED Trigger: " + rr.Words[0].Confidence + " Text: " + rr.Words[0].Text);
+        cfg.logWarning("ENGINE - "+Name, "REJECTED Trigger: " + rr.Words[0].Confidence + " Text: " + rr.Words[0].Text);
         return null;
       }
 
-      cfg.logInfo("ENGINE", "RECOGNIZED Speech: " + rr.Confidence + "/" + rr.Words[0].Confidence + " Device: " + WSRSpeech.GetInstance().GetDeviceInfo(this) + " Text: " + rr.Text);
-      cfg.logDebug("ENGINE", xnav.OuterXml);
+      cfg.logWarning("ENGINE - "+Name, "RECOGNIZED Speech: " + rr.Confidence + " / " + rr.Words[0].Confidence + " (" + rr.Words[0].Text + ")" + " Device: " + WSRSpeech.GetInstance().GetDeviceInfo(this) + " Text: " + rr.Text);
+      cfg.logDebug("ENGINE - "+Name, xnav.OuterXml);
 
       if (cfg.DEBUG) { WSRSpeech.GetInstance().DumpAudio(rr); } 
 
@@ -219,8 +219,13 @@ namespace net.encausse.sarah {
     protected void recognizer_SpeechRecognized(object sender, SpeechRecognizedEventArgs e) {
       RecognitionResult rr = e.Result;
 
+      if (!WSRSpeech.GetInstance().Listening) {
+        cfg.logInfo("ENGINE - " + Name, "REJECTED not listening");
+        return;
+      }
+
       if (IsWorking) {
-        cfg.logInfo("ENGINE", "REJECTED Speech while working: " + rr.Confidence + " Text: " + rr.Text);
+        cfg.logInfo("ENGINE - " + Name, "REJECTED Speech while working: " + rr.Confidence + " Text: " + rr.Text);
         return;
       }
 
@@ -231,29 +236,29 @@ namespace net.encausse.sarah {
         SpeechRecognized(rr);
       } 
       catch(Exception ex){
-        cfg.logError("ENGINE", ex);
+        cfg.logError("ENGINE - " + Name, ex);
       }
 
       IsWorking = false;
       var stop = DateTime.Now;
-      cfg.logInfo("ENGINE", "SpeechRecognized: " + (stop - start).TotalMilliseconds + "ms");
+      cfg.logInfo("ENGINE - " + Name, "SpeechRecognized: " + (stop - start).TotalMilliseconds + "ms");
     }
 
     protected void recognizer_RecognizeCompleted(object sender, RecognizeCompletedEventArgs e) {
       String resultText = e.Result != null ? e.Result.Text : "<null>";
-      cfg.logInfo( "ENGINE", Name + ": RecognizeCompleted (" + DateTime.Now.ToString("mm:ss.f") + "): " + resultText);
-      cfg.logDebug("ENGINE", Name + ": BabbleTimeout: " + e.BabbleTimeout + "; InitialSilenceTimeout: " + e.InitialSilenceTimeout + "; Result text: " + resultText);
+      cfg.logInfo("ENGINE - " + Name, "RecognizeCompleted (" + DateTime.Now.ToString("mm:ss.f") + "): " + resultText);
+      cfg.logDebug("ENGINE - " + Name, "BabbleTimeout: " + e.BabbleTimeout + "; InitialSilenceTimeout: " + e.InitialSilenceTimeout + "; Result text: " + resultText);
 
       // StartRecognizer();
     }
     protected void recognizer_AudioStateChanged(object sender, AudioStateChangedEventArgs e) {
-      cfg.logDebug("ENGINE", Name + ": AudioStateChanged (" + DateTime.Now.ToString("mm:ss.f") + "):" + e.AudioState);
+      cfg.logDebug("ENGINE - " + Name, "AudioStateChanged (" + DateTime.Now.ToString("mm:ss.f") + "):" + e.AudioState);
     }
     protected void recognizer_SpeechHypothesized(object sender, SpeechHypothesizedEventArgs e) {
-      cfg.logDebug("ENGINE", Name + ": recognizer_SpeechHypothesized");
+      cfg.logDebug("ENGINE - " + Name, "recognizer_SpeechHypothesized");
     }
     protected void recognizer_SpeechDetected(object sender, SpeechDetectedEventArgs e) {
-      cfg.logDebug("ENGINE", Name + ": recognizer_SpeechDetected");
+      cfg.logDebug("ENGINE - " + Name, "recognizer_SpeechDetected");
     }
 
     // ==========================================
@@ -263,18 +268,18 @@ namespace net.encausse.sarah {
     public void Start() {
       try {
         engine.RecognizeAsync(RecognizeMode.Multiple);
-        cfg.logInfo("ENGINE", Name + ": Start listening");
+        cfg.logInfo("ENGINE - " + Name, "Start listening");
       }
       catch (Exception ex) {
-        cfg.logError("ENGINE", Name + ": No device found");
-        cfg.logError("ENGINE", ex);
+        cfg.logError("ENGINE - " + Name, "No device found");
+        cfg.logError("ENGINE - " + Name, ex);
       }
     }
 
     public void Stop() {
       engine.RecognizeAsyncStop();
       engine.Dispose();
-      cfg.logInfo("ENGINE", Name + ": Stop listening...done");
+      cfg.logInfo("ENGINE - " + Name, "Stop listening...done");
     }
   }
 }

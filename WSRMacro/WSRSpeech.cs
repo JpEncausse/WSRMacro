@@ -23,6 +23,9 @@ namespace net.encausse.sarah {
 
   public class WSRSpeech {
 
+    public bool Listening { get; set; } 
+    
+
     // ==========================================
     //  SINGLETON
     // ==========================================
@@ -37,11 +40,19 @@ namespace net.encausse.sarah {
 
     public void Init() {
 
+      Listening = true;
+
       // Load grammar files
       LoadGrammar();
 
+      // Set default context
+      SetContext("default");
+
       // Init Engines
-      InitEngines();
+      try { InitEngines(); }
+      catch (Exception ex) {
+        WSRConfig.GetInstance().logError("ENGINE", "InitEngines: " + ex.Message);
+      }
 
       // Start audio watcher
       InitAudioWatcher();
@@ -65,31 +76,31 @@ namespace net.encausse.sarah {
     //  ENGINE
     // ==========================================
 
-    WSRSpeechEngine defaultEngine;
-    WSRSpeechEngine fileEngine;
-    WSRSpeechEngine rtpEngine;
+    WSRSpeechEngine defaultEngine = null;
+    WSRSpeechEngine fileEngine = null;
+    WSRSpeechEngine rtpEngine = null;
 
     public void InitEngines() {
 
       WSRConfig cfg = WSRConfig.GetInstance();
 
       // Default
-      defaultEngine = new WSRSpeechEngine("Default", cfg.confidence);
-      defaultEngine.Init(cfg.language);
+      defaultEngine = new WSRSpeechEngine("Default", cfg.language, cfg.confidence);
       defaultEngine.LoadGrammar();
       cfg.GetWSRMicro().SetupAudioEngine(defaultEngine);
+      defaultEngine.Init();
       defaultEngine.Start();
-
+      
       // File
-      fileEngine = new WSRSpeechEngine("File", cfg.confidence);
-      fileEngine.Init(cfg.language);
+      fileEngine = new WSRSpeechEngine("File", cfg.language, cfg.confidence);
       fileEngine.LoadGrammar();
+      fileEngine.Init();
 
       // Network
       if (WSRConfig.GetInstance().rtpport > 0) {
-        rtpEngine = new WSRSpeechEngine("RTP", cfg.confidence);
-        rtpEngine.Init(cfg.language);
+        rtpEngine = new WSRSpeechEngine("RTP", cfg.language, cfg.confidence);
         rtpEngine.LoadGrammar();
+        rtpEngine.Init();
         cfg.GetWSRMicro().SetupRTPEngine(rtpEngine);
         rtpEngine.Start();
       }
@@ -106,6 +117,8 @@ namespace net.encausse.sarah {
       fileEngine.GetEngine().SetInputToWaveFile(fileName);
       fileEngine.GetEngine().Recognize();
     }
+
+
 
     // ==========================================
     //  GRAMMAR
@@ -137,7 +150,7 @@ namespace net.encausse.sarah {
     }
 
     protected void LoadGrammar(DirectoryInfo dir) {
-      WSRConfig.GetInstance().logDebug("GRAMMAR", "Load directory: " + dir.FullName);
+      // WSRConfig.GetInstance().logDebug("GRAMMAR", "Load directory: " + dir.FullName);
       DIR_PATH = DIR_PATH != null ? DIR_PATH : dir.FullName;
 
       // Load Grammar
@@ -168,6 +181,7 @@ namespace net.encausse.sarah {
       WSRSpeecGrammar grammar = new WSRSpeecGrammar();
       grammar.XML = xml;
       grammar.Name = name;
+      grammar.Path = file;
 
       // Check contexte
       grammar.Enabled = true;
@@ -176,14 +190,21 @@ namespace net.encausse.sarah {
         grammar.Enabled = false;
       }
 
+      // Add to context if there is no context
+      if (!WSRConfig.GetInstance().HasContext() && grammar.Enabled) {
+        WSRConfig.GetInstance().context.Add(name);
+        logInfo("GRAMMAR", "Add to context list: " + name);
+      }
+
       // Cache XML
-      cache.Add(file, grammar);
+      cache.Add(name, grammar);
     }
 
-    public void LoadGrammar(SpeechRecognitionEngine sre) {
+    public void LoadGrammar(WSRSpeechEngine engine) {
+      SpeechRecognitionEngine sre = engine.GetEngine();
       sre.UnloadAllGrammars();
       foreach (WSRSpeecGrammar g in cache.Values) {
-        g.LoadGrammar(sre);
+        g.LoadGrammar(engine);
       }
     }
 
@@ -231,7 +252,7 @@ namespace net.encausse.sarah {
       
       // Reload all grammar
       LoadGrammar();
-      
+
       // Set context back
       SetContext(tmpContext);
 
@@ -268,7 +289,6 @@ namespace net.encausse.sarah {
         g.Enabled = context.Contains(g.Name);
         logInfo("CONTEXT", g.Name + " = " + g.Enabled);
       }
-      ForwardContext();
     }
 
     public void SetContext(String context) {
@@ -285,7 +305,6 @@ namespace net.encausse.sarah {
         g.Enabled = all || context.Equals(g.Name);
         logInfo("CONTEXT", g.Name + " = " + g.Enabled);
       }
-      ForwardContext();
     }
 
     System.Timers.Timer ctxTimer = null;
@@ -301,9 +320,11 @@ namespace net.encausse.sarah {
 
     protected void timer_Elapsed(object sender, EventArgs e) {
       logInfo("CONTEXT", "End context timeout");
-      SetContext("default");
       ctxTimer.Stop();
       ctxTimer = null;
+
+      SetContext("default");
+      ForwardContext();
     }
 
     public void ResetContextTimeout() {
@@ -314,10 +335,12 @@ namespace net.encausse.sarah {
     }
 
     public void ForwardContext() {
+      logInfo("CONTEXT", "Forward Context enable/disable grammar");
       foreach (Grammar g in defaultEngine.GetEngine().Grammars) {
         WSRSpeecGrammar s = null;
         if (cache.TryGetValue(g.Name, out s)){
           g.Enabled = s.Enabled;
+          logInfo("CONTEXT", g.Name + " = " + s.Enabled);
         }
       }
     }
@@ -329,8 +352,10 @@ namespace net.encausse.sarah {
     FileSystemWatcher audioWatcher = null;
     protected void InitAudioWatcher() {
 
+      if (audioWatcher != null) { return; }
       String directory = WSRConfig.GetInstance().audioWatcher;
       if (!Directory.Exists(directory)) { return; }
+
 
       logInfo("ENGINE", "Init Audio Watcher: " + directory);
       audioWatcher = new FileSystemWatcher();
@@ -425,22 +450,24 @@ namespace net.encausse.sarah {
   public class WSRSpeecGrammar {
     public String XML { get; set; }
     public String Name { get; set; }
+    public String Path { get; set; }
     public bool Enabled { get; set; }
 
-    public Grammar LoadGrammar(SpeechRecognitionEngine sre) {
-      Grammar grammar = null;
+    public void LoadGrammar(WSRSpeechEngine engine) {
+
+      SpeechRecognitionEngine sre = engine.GetEngine();
       using (Stream s = StreamFromString(XML)) {
-        try { 
-          grammar = new Grammar(s);
+        try {
+          Grammar grammar = new Grammar(s);
           grammar.Enabled = Enabled;
           grammar.Name = Name;
+          WSRConfig.GetInstance().logInfo("GRAMMAR", engine.Name + ": Load: " + Name + " Enabled: " + grammar.Enabled);
           sre.LoadGrammar(grammar);
         }
-        catch (Exception ex) { 
-          WSRConfig.GetInstance().logInfo("GRAMMAR", "Error file: " + Name + ": " + ex.Message);
+        catch (Exception ex) {
+          WSRConfig.GetInstance().logError("GRAMMAR", engine.Name + ": Error file: " + Name + ": " + ex.Message);
         }
       }
-      return grammar;
     }
 
     private Stream StreamFromString(string s) {

@@ -62,7 +62,7 @@ namespace net.encausse.sarah {
       if (colorFrame != null) { WSRConfig.GetInstance().logDebug("FACERECO", " ByPass detection"); return; }
 
       colorFrame = new Image<Bgr, Byte>(GetBitmapFromBitmapSource(bitmap));
-      Task.Factory.StartNew(() => {
+      Task.Run(() => {  // Factory.StartNew
         UpdateDetection(colorFrame);
         colorFrame = null;
       });

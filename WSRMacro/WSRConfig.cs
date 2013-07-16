@@ -22,6 +22,7 @@ namespace net.encausse.sarah {
     public List<string> directories = new List<string>();
     public List<string> context = new List<string>();
     public int ctxTimeout = 30000;
+    public int restart = 1000 * 60 * 60; // 1 hour
     private bool hasContext = false;
     public string audioWatcher = "audio";
 
@@ -42,7 +43,7 @@ namespace net.encausse.sarah {
     public int loopback = 8088;
     
     // RTPPort
-    public int rtpport = 7887;
+    public int rtpport = -1;
 
     bool gesture = false;
     bool seated  = false;
@@ -114,15 +115,16 @@ namespace net.encausse.sarah {
     // ==========================================
 
     public void SetupMicro(){
+      if (wsr != null) return;
       logInfo("INIT", "==========================================");
-      logInfo("INIT", "S.A.R.A.H.");
+      logInfo("INIT", "S.A.R.A.H. => " + (IsKinect() ? "KINECT" : "MICRO"));
       logInfo("INIT", "==========================================");
       logInfo("INIT", "Server: " + GetRemoteURL());
       logInfo("INIT", "Confidence: " + confidence);
       logInfo("INIT", "==========================================");
 
       wsr = config.IsKinect() ? new WSRKinect() : new WSRMicro();
-      wsr.Init();
+      // wsr.Init();
     }
 
     public WSRMicro GetWSRMicro() {
@@ -168,6 +170,7 @@ namespace net.encausse.sarah {
             context.Add(property.Value); 
           }
           else if (property.Key == "ctxTimeout") { ctxTimeout = int.Parse(property.Value); }
+          else if (property.Key == "restart")    { restart = int.Parse(property.Value); }
           else if (property.Key == "name")       { name = property.Value; }
           else if (property.Key == "trigger")    { trigger = double.Parse(property.Value, culture); }
           else if (property.Key == "confidence") { confidence = double.Parse(property.Value, culture); }
@@ -271,7 +274,7 @@ namespace net.encausse.sarah {
     public void SetupLogging() {
 
       LoggingConfiguration config = new LoggingConfiguration();
-
+      
       // Build Targets ----------
 
       ColoredConsoleTarget consoleTarget = new ColoredConsoleTarget();
@@ -283,9 +286,10 @@ namespace net.encausse.sarah {
 
       var viewerTarget = new NLogViewerTarget() {
         Name = "viewer",
-        Address = "udp://127.0.0.1:9999"
+        Address = "udp://localhost:9999",
+        Layout = "${message}"
       };
-      viewerTarget.Layout = "${logger} ${message}";
+      viewerTarget.Renderer.IncludeNLogData = false;
 
       // Add Targets ----------
 
@@ -311,21 +315,24 @@ namespace net.encausse.sarah {
 
     public void logInfo(String context, String msg) {
       Logger logger = LogManager.GetLogger("SARAH");
-      logger.Info("[{0}] [{1}]\t {2}", DateTime.Now.ToString("yyyy:MM:dd HH:mm:ss"), context, msg);
+      logger.Info("[{0}] [{1}]\t {2}", DateTime.Now.ToString("HH:mm:ss"), context, msg);
     }
-
+    public void logWarning(String context, String msg) {
+      Logger logger = LogManager.GetLogger("SARAH");
+      logger.Warn("[{0}] [{1}]\t {2}", DateTime.Now.ToString("HH:mm:ss"), context, msg);
+    }
     public void logDebug(String context, String msg) {
       if (!DEBUG) { return; }
       Logger logger = LogManager.GetLogger("SARAH");
-      logger.Debug("[{0}] [{1}]\t {2}", DateTime.Now.ToString("yyyy:MM:dd HH:mm:ss"), context, msg);
+      logger.Debug("[{0}] [{1}]\t {2}", DateTime.Now.ToString("HH:mm:ss"), context, msg);
     }
     public void logError(String context, String msg) {
       Logger logger = LogManager.GetLogger("SARAH"); 
-      logger.Error("[{0}] [{1}]\t {2}", DateTime.Now.ToString("yyyy:MM:dd HH:mm:ss"), context, msg);
+      logger.Error("[{0}] [{1}]\t {2}", DateTime.Now.ToString("HH:mm:ss"), context, msg);
     }
     public void logError(String context, Exception ex) {
       Logger logger = LogManager.GetLogger("SARAH");
-      logger.Error("[{0}] [{1}]\t {2}", DateTime.Now.ToString("yyyy:MM:dd HH:mm:ss"), context, ex);
+      logger.Error("[{0}] [{1}]\t {2}", DateTime.Now.ToString("HH:mm:ss"), context, ex);
     }
   }
 }

@@ -10,6 +10,7 @@ namespace net.encausse.sarah {
   /// <summary>
   /// Connects to an RTP stream and listens for data
   /// http://stackoverflow.com/questions/15886888/c-sharp-capture-rtp-stream-and-send-to-speech-recognition/15934124#15934124
+  /// ffmpeg -f dshow -i audio="Réseau de microphones (Kinect U" -f rtp rtp://127.0.0.1:7887
   /// </summary>
   public class RTPClient {
     private const int AUDIO_BUFFER_SIZE = 65536;
@@ -17,7 +18,7 @@ namespace net.encausse.sarah {
     private UdpClient client;
     private IPEndPoint endPoint;
     private SpeechStreamer audioStream;
-    private bool writeHeaderToConsole = false;
+    private bool writeHeaderToConsole = true;
     private bool listening = false;
     private int port;
     private Thread listenerThread;
@@ -46,14 +47,14 @@ namespace net.encausse.sarah {
     /// </summary>
     /// <param name="port">The port to listen on</param>
     public RTPClient(int port) {
-      Console.WriteLine(" [RTPClient] Loading...");
+      WSRConfig.GetInstance().logInfo("RTPClient", "Loading...");
 
       this.port = port;
 
       // Initialize the audio stream that will hold the data
       audioStream = new SpeechStreamer(AUDIO_BUFFER_SIZE);
 
-      Console.WriteLine(" Done");
+      WSRConfig.GetInstance().logInfo("RTPClient", "Done");
     }
 
     /// <summary>
@@ -62,14 +63,14 @@ namespace net.encausse.sarah {
     public void StartClient() {
       // Create new UDP client. The IP end point tells us which IP is sending the data
       client = new UdpClient(port);
-      endPoint = new IPEndPoint(IPAddress.Any, port);
+      endPoint = new IPEndPoint(IPAddress.Loopback, port);
+      
+      WSRConfig.GetInstance().logInfo("RTPClient", "Listening for packets on port " + port + "...");
 
       listening = true;
       listenerThread = new Thread(ReceiveCallback);
       listenerThread.Name = "UDP Thread";
       listenerThread.Start();
-
-      Console.WriteLine(" [RTPClient] Listening for packets on port " + port + "...");
     }
 
     /// <summary>
@@ -80,7 +81,7 @@ namespace net.encausse.sarah {
       listening = false;
       listenerThread.Interrupt();
       try { client.Close(); } catch (SocketException) { }
-      Console.WriteLine(" [RTPClient] Stopped listening on port " + port);
+      WSRConfig.GetInstance().logInfo("RTPClient", "Stopped listening on port " + port);
     }
 
     public void Dispose() {
@@ -92,6 +93,8 @@ namespace net.encausse.sarah {
     /// </summary>
     /// <param name="ar">Contains packet data</param>
     private void ReceiveCallback() {
+      WSRConfig.GetInstance().logInfo("RTPClient", "ReceiveCallback");
+
       // Begin looking for the next packet
       while (listening) {
         // Receive packet
@@ -110,16 +113,8 @@ namespace net.encausse.sarah {
           int ssrcId = GetRTPHeaderValue(packet, 64, 95);
 
           if (writeHeaderToConsole) {
-            Console.WriteLine("{0} {1} {2} {3} {4} {5} {6} {7} {8}",
-                version,
-                padding,
-                extension,
-                csrcCount,
-                marker,
-                payloadType,
-                sequenceNum,
-                timestamp,
-                ssrcId);
+            WSRConfig.GetInstance().logDebug("RTPClient", 
+                version+", "+padding+", "+extension+", "+csrcCount+", "+marker+", "+payloadType+", "+sequenceNum+", "+timestamp+", "+ssrcId);
           }
 
           // Write the packet to the audio stream

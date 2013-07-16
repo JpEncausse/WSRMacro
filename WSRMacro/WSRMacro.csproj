@@ -92,6 +92,7 @@
       <SubType>Designer</SubType>
     </Content>
     <Content Include="plugins\allocine\allocine.xml" />
+    <Content Include="plugins\blague\blague.xml" />
     <Content Include="plugins\blink\blink.xml" />
     <Content Include="plugins\calendar\calendar.xml" />
     <Content Include="plugins\chatterbot\lazyChatterbot.xml">
@@ -123,6 +124,7 @@
     </None>
     <Content Include="plugins\simsimi\lazySimsimi.xml" />
     <Content Include="plugins\simsimi\simsimi.xml" />
+    <Content Include="plugins\stationMeteoOpenpicus\stationMeteoOpenpicus.xml" />
     <Content Include="plugins\translate\lazyTranslate.xml" />
     <Content Include="plugins\translate\translate.xml" />
     <Content Include="plugins\vera\vera.xml" />
@@ -152,8 +154,9 @@
     <Reference Include="CloudSpeech">
       <HintPath>dll\CloudSpeech.dll</HintPath>
     </Reference>
-    <Reference Include="Common.Logging.NLog20">
-      <HintPath>..\packages\Common.Logging.NLog20.2.1.2\lib\net40\Common.Logging.NLog20.dll</HintPath>
+    <Reference Include="Common.Logging, Version=2.0.0.0, Culture=neutral, PublicKeyToken=af08829b84f0328e, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Common.Logging.2.0.0\lib\2.0\Common.Logging.dll</HintPath>
     </Reference>
     <Reference Include="CUETools.Codecs">
       <HintPath>dll\CUETools.Codecs.dll</HintPath>
@@ -206,7 +209,7 @@
     </Reference>
     <Reference Include="NLog, Version=2.0.1.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\NLog.2.0.1.2\lib\net45\NLog.dll</HintPath>
+      <HintPath>..\packages\NLog.2.0.1.2\lib\net40\NLog.dll</HintPath>
     </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />

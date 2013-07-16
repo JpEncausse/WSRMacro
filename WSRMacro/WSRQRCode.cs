@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Text;
-using Microsoft.Kinect;
-using ZXing;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Threading.Tasks;
+using Microsoft.Kinect;
+using ZXing;
 
 namespace net.encausse.sarah {
 
