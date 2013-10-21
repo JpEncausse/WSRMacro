@@ -26,7 +26,7 @@ namespace net.encausse.sarah {
     // ==========================================
     //  CONSTRUCTOR
     // ==========================================
-
+    
     public virtual void Init() {
 
       // Start RTP Client
@@ -36,7 +36,8 @@ namespace net.encausse.sarah {
       WSRHttpManager.GetInstance().StartHttpServer();
 
       // Start Speech Manager
-      WSRSpeech.GetInstance().Init();
+      WSRSpeechManager.GetInstance().Init();
+      InitSpeechEngine();
 
       // Start Timeout
       RestartTimeout();
@@ -52,8 +53,15 @@ namespace net.encausse.sarah {
       WSRHttpManager.GetInstance().Dispose();
 
       // Stop Speech Manager
-      WSRSpeech.GetInstance().Dispose();
+      WSRSpeechManager.GetInstance().Dispose();
+
+      // Stop Speaker
+      WSRSpeakerManager.GetInstance().Dispose();
     }
+
+    // ==========================================
+    //  SPEECH / RESTART
+    // ==========================================
 
     public virtual void Restart() {
 
@@ -61,7 +69,7 @@ namespace net.encausse.sarah {
       WSRConfig.GetInstance().logInfo("ENGINE", "Restarting WSR: dispose");
       try {
         DisposeRTPClient();
-        WSRSpeech.GetInstance().Dispose();
+        StopSpeechEngine();
       }
       catch (Exception ex) { WSRConfig.GetInstance().logError("ENGINE", "Restarting WSR: " + ex.Message); }
 
@@ -69,33 +77,30 @@ namespace net.encausse.sarah {
       WSRConfig.GetInstance().logInfo("ENGINE", "Restarting WSR: initialize");
       try {
         StartRTPClient();
-        WSRSpeech.GetInstance().Init();
+        InitSpeechEngine();
       }
       catch (Exception ex) { WSRConfig.GetInstance().logError("ENGINE", "Restarting WSR: " + ex.Message); }
-      
-      // Done
-      WSRConfig.GetInstance().logInfo("ENGINE", "Restarting WSR: done");
     }
 
-    System.Timers.Timer restartTimer = null;
+    System.Timers.Timer RestartTimer = null;
     public void RestartTimeout() {
-      if (restartTimer != null) { return; }
+      if (RestartTimer != null) { return; }
       if (WSRConfig.GetInstance().restart <= 0) { return; }
 
       WSRConfig.GetInstance().logInfo("ENGINE", "Restart timeout: " + WSRConfig.GetInstance().restart);
-      restartTimer = new System.Timers.Timer();
-      restartTimer.Interval = WSRConfig.GetInstance().restart;
-      restartTimer.Elapsed += new System.Timers.ElapsedEventHandler(timer_Elapsed);
-      restartTimer.Enabled = true;
-      restartTimer.Start();
+      RestartTimer = new System.Timers.Timer();
+      RestartTimer.Interval = WSRConfig.GetInstance().restart;
+      RestartTimer.Elapsed += new System.Timers.ElapsedEventHandler(timer_Elapsed);
+      RestartTimer.Enabled = true;
+      RestartTimer.Start();
     }
 
     protected void timer_Elapsed(object sender, EventArgs e) {
       Restart();
-      restartTimer.Stop();
-      restartTimer.Start();
+      RestartTimer.Stop();
+      RestartTimer.Start();
     }
-
+ 
     // ==========================================
     //  HANDLE RTPClient
     // ==========================================
@@ -106,6 +111,9 @@ namespace net.encausse.sarah {
      *  Can be called on RaspberryPi using ffmpeg
      *  ffmpeg -ac 1 -f alsa -i hw:1,0 -ar 16000 -acodec pcm_s16le -f rtp rtp://192.168.0.8:7887
      *  avconv -f alsa -ac 1 -i hw:0,0 -acodec mp2 -b 64k -f rtp rtp://{IP of your laptop}:1234
+     *  
+     *  Or using Kinect on windows
+     *  ffmpeg  -f dshow  -i audio="Réseau de microphones (Kinect U"   -ar 16000 -acodec pcm_s16le -f rtp rtp://127.0.0.1:7887
      */
     protected void StartRTPClient() {
       var port = WSRConfig.GetInstance().rtpport;
@@ -123,16 +131,6 @@ namespace net.encausse.sarah {
         rtpClient.Dispose();
       }
       WSRConfig.GetInstance().logError("RTPCLIENT", "Stop RTPClient ... Done");
-    }
-
-    public virtual void SetupRTPEngine(WSRSpeechEngine engine) {
-      if (rtpClient == null) { return; }
-      var format = new SpeechAudioFormatInfo(
-        16000, 
-        AudioBitsPerSample.Sixteen, 
-        AudioChannel.Stereo);
-
-      engine.GetEngine().SetInputToAudioStream(rtpClient.AudioStream, format);
     }
 
     // ==========================================
@@ -155,30 +153,43 @@ namespace net.encausse.sarah {
     //  HANDLE HTTPSERVER
     // ==========================================
 
-    public virtual bool HandleCustomRequest(NHttp.HttpRequestEventArgs e) {
+    public virtual bool HandleCustomRequest(NHttp.HttpRequestEventArgs e, StreamWriter writer) {
+
+      // Status
+      String status = e.Request.Params.Get("status");
+      if (status != null) {
+        if (WSRSpeakerManager.GetInstance().Speaking)
+          writer.Write("speaking");
+      }
 
       // Stop Music
       String pause = e.Request.Params.Get("pause");
       if (pause != null) {
-        WSRSpeaker.GetInstance().Stop(pause);
+        WSRSpeakerManager.GetInstance().Stop(pause);
       }
 
       // Play Music
       String mp3 = e.Request.Params.Get("play");
       if (mp3 != null) {
-        WSRSpeaker.GetInstance().Play(mp3); 
+        WSRSpeakerManager.GetInstance().Play(mp3); 
+      }
+
+      // Recognize String
+      String emulate = e.Request.Params.Get("emulate");
+      if (emulate != null) {
+        WSRSpeechManager.GetInstance().RecognizeString(emulate);
       }
 
       // Recognize
       String audio = e.Request.Params.Get("recognize");
       if (audio != null) {
-        WSRSpeech.GetInstance().Recognize(audio);
+        WSRSpeechManager.GetInstance().RecognizeFile(audio);
       }
 
       // Listening
       String listen = e.Request.Params.Get("listen");
       if (listen != null) {
-        WSRSpeech.GetInstance().Listening = bool.Parse(listen);
+        WSRSpeechManager.GetInstance().Listening = bool.Parse(listen);
       }
 
       // Recognize File
@@ -188,7 +199,7 @@ namespace net.encausse.sarah {
         using (var reader = new BinaryReader(file.InputStream)) {
           data = reader.ReadBytes(file.ContentLength);
         }
-        var path = WSRConfig.GetInstance().audioWatcher+"/"+file.FileName;
+        var path = WSRConfig.GetInstance().audio+"/"+file.FileName;
         if (File.Exists(path)) { File.Delete(path); }
         File.WriteAllBytes(path, data);
       }
@@ -197,13 +208,13 @@ namespace net.encausse.sarah {
       String tts = e.Request.Params.Get("tts");
       if (tts != null) {
         tts = e.Server.HtmlDecode(tts);
-        WSRSpeaker.GetInstance().Speak(tts, e.Request.Params.Get("sync") == null);
+        WSRSpeakerManager.GetInstance().Speak(tts, e.Request.Params.Get("sync") == null);
       }
 
       // Text To Speech - Stop
       String notts = e.Request.Params.Get("notts");
       if (notts != null) {
-        WSRSpeaker.GetInstance().ShutUp();
+        WSRSpeakerManager.GetInstance().ShutUp();
       }
 
       // Text To Speech - Stop
@@ -215,9 +226,9 @@ namespace net.encausse.sarah {
       // Set Context
       String ctxt = e.Request.Params.Get("context");
       if (ctxt != null) {
-        WSRSpeech.GetInstance().SetContext(new List<string>(ctxt.Split(',')));
-        WSRSpeech.GetInstance().SetContextTimeout();
-        WSRSpeech.GetInstance().ForwardContext();
+        WSRSpeechManager.GetInstance().SetContext(new List<string>(ctxt.Split(',')));
+        WSRSpeechManager.GetInstance().SetContextTimeout();
+        WSRSpeechManager.GetInstance().ForwardContext();
       }
 
       // Process
@@ -261,18 +272,33 @@ namespace net.encausse.sarah {
     //  HANDLE SPEECH RECOGNITION
     // ==========================================
 
-    public virtual void SetupAudioEngine(WSRSpeechEngine engine) {
+    public virtual void InitSpeechEngine() { InitSpeechEngine(true); }
+    protected      void InitSpeechEngine(bool def) {
       try {
-        engine.GetEngine().SetInputToDefaultAudioDevice();
-        WSRConfig.GetInstance().logInfo("ENGINE", "Audio Level: " + engine.GetEngine().AudioLevel);
+
+        WSRConfig cfg = WSRConfig.GetInstance();
+        WSRSpeechManager manager = WSRSpeechManager.GetInstance();
+
+        // File
+        manager.InitEngines();
+
+        // Default
+        if (def){
+          manager.AddDefaultEngine("Default", cfg.language, cfg.confidence);
+        }
+
+        // RTP
+        if (rtpClient == null) { return; }
+        var format = new SpeechAudioFormatInfo(16000, AudioBitsPerSample.Sixteen, AudioChannel.Stereo);
+        manager.AddEngine("RTP", cfg.language, cfg.confidence, rtpClient.AudioStream, format);
       }
-      catch (InvalidOperationException ex) {
-        WSRConfig.GetInstance().logError("ENGINE", "No default input device: " + ex.Message);
+      catch (Exception ex) {
+        WSRConfig.GetInstance().logError("ENGINE", "InitEngines: " + ex.Message);
       }
     }
 
-    public virtual String GetDeviceInfo() {
-      return  "";
+    public virtual void StopSpeechEngine() {
+      WSRSpeechManager.GetInstance().Dispose();
     }
 
     public virtual String HandleCustomAttributes(XPathNavigator xnav) {
@@ -294,35 +320,35 @@ namespace net.encausse.sarah {
     protected void HandleTTS(XPathNavigator xnav) {
       XPathNavigator tts = xnav.SelectSingleNode("/SML/action/@tts");
       if (tts != null) {
-        WSRSpeaker.GetInstance().Speak(tts.Value, true);
+        WSRSpeakerManager.GetInstance().Speak(tts.Value, true);
       }
 
       XPathNavigator notts = xnav.SelectSingleNode("/SML/action/@notts");
       if (notts != null) {
-        WSRSpeaker.GetInstance().ShutUp();
+        WSRSpeakerManager.GetInstance().ShutUp();
       }
     }
 
     protected void HandlePlay(XPathNavigator xnav) {
       XPathNavigator play = xnav.SelectSingleNode("/SML/action/@play");
       if (play != null) {
-        WSRSpeaker.GetInstance().Play(play.Value);
+        WSRSpeakerManager.GetInstance().Play(play.Value);
       }
     }
 
     protected void HandleListen(XPathNavigator xnav) {
       XPathNavigator listen = xnav.SelectSingleNode("/SML/action/@listen");
       if (listen != null) {
-        WSRSpeech.GetInstance().Listening = bool.Parse(listen.Value);
+        WSRSpeechManager.GetInstance().Listening = bool.Parse(listen.Value);
       }
     }
 
     protected void HandleContext(XPathNavigator xnav) {
       XPathNavigator ctxt = xnav.SelectSingleNode("/SML/action/@context");
       if (ctxt != null) {
-        WSRSpeech.GetInstance().SetContext(new List<string>(ctxt.Value.Split(',')));
-        WSRSpeech.GetInstance().SetContextTimeout();
-        WSRSpeech.GetInstance().ForwardContext();
+        WSRSpeechManager.GetInstance().SetContext(new List<string>(ctxt.Value.Split(',')));
+        WSRSpeechManager.GetInstance().SetContextTimeout();
+        WSRSpeechManager.GetInstance().ForwardContext();
       }
     }
   }

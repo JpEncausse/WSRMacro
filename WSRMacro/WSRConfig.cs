@@ -15,58 +15,119 @@ namespace net.encausse.sarah {
 
   public class WSRConfig {
     bool help = false;
-    public bool DEBUG = false;
 
-    // Grammar contex
+    // Logging
+    public bool DEBUG  = false;
+    private int udpport = 9999;
+    private String logfile = null;
+
+    // Grammar context
     public String name = "SARAH";
-    public List<string> directories = new List<string>();
-    public List<string> context = new List<string>();
-    public int ctxTimeout = 30000;
-    public int restart = 1000 * 60 * 60; // 1 hour
-    private bool hasContext = false;
-    public string audioWatcher = "audio";
-
     public double trigger = 0.85;
     public double confidence = 0.70;
-    public double dictation  = 0.40;
-    public bool adaptation = false;
 
-    // NodeJS Server
-    public String server = "127.0.0.1";
-    public String port = "8080";
+    public int restart = 1000 * 60 * 60; // 1 hour
+
+    // Pitch
+    public int PitchDelta = 40;
+
+    // Httpserver port
+    public int loopback = 8888;
+
+    // RTPPort
+    public int rtpport = -1;
 
     // Engine language
     public String language = "fr-FR";
     public String voice = null;
-    
-    // Httpserver port
-    public int loopback = 8088;
-    
-    // RTPPort
-    public int rtpport = -1;
+    public String audio = "audio";
+    public String Speakers = "0";
+    public int SpkVolTTS  = 100;
+    public int SpkVolPlay = 100;
 
-    bool gesture = false;
-    bool seated  = false;
-    bool picture = false;
+    public bool SpeechOnly = false;
 
-    // QRCode (check / frame)
-    public int qrcode = 0;
+    // Grammar
+    public int ctxTimeout = 30000;
+    public List<string> directories = new List<string>();
+    public List<string> context = new List<string>();
+    private bool hasContext = false;
 
-    // Face Tracking (req / s)
-    public int facetrack = 0;
-    public bool terminator = false;
+    // NodeJS Server
+    private String server = "127.0.0.1";
+    private String port = "8080";
+
+    // Kinect
+    public bool Adaptation { get; set; }
+    public bool IsSeated   { get; set; }
+    public int SensorElevation { get; set; }
+    public int GestureFix = 80;
+    public int Echo = -1;
+    public int FPS = 1;
+
+    public int MaxAlternates = 10;
+    public TimeSpan InitialSilenceTimeout      = TimeSpan.FromSeconds(0);
+    public TimeSpan BabbleTimeout              = TimeSpan.FromSeconds(0);
+    public TimeSpan EndSilenceTimeout          = TimeSpan.FromSeconds(0);
+    public TimeSpan EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(0);
+
+    public bool StandByGesture = false;
+    public bool StandByFace    = false;
+
+    // Task (in ms)
+    public TimeSpan Motion      = TimeSpan.FromMilliseconds(200);
+    public TimeSpan Gesture     = TimeSpan.FromMilliseconds(45);
+    public TimeSpan QRCode      = TimeSpan.FromMilliseconds(200);
+    public TimeSpan Color       = TimeSpan.FromMilliseconds(0);
+    public TimeSpan FaceDetec   = TimeSpan.FromMilliseconds(45);
+    public TimeSpan FaceReco    = TimeSpan.FromMilliseconds(200);
+    public TimeSpan FaceTrack   = TimeSpan.FromMilliseconds(45);
+    public TimeSpan FaceRepaint = TimeSpan.FromMilliseconds(15);
+
+    public int MotionTH = 10;
+    public TimeSpan StandBy     = TimeSpan.FromMilliseconds(300000);
+    public TimeSpan GestureTH   = TimeSpan.FromMilliseconds(1000);
+    public TimeSpan QRCodeTH    = TimeSpan.FromMilliseconds(2000);
+    public TimeSpan ColorTH     = TimeSpan.FromMilliseconds(0);
+    public TimeSpan FaceTH      = TimeSpan.FromMilliseconds(300000);
 
     // Websocket port
-    public int websocket = -1;
-    public string websocktype = "png";
+    public int WebSocket  = -1;
+    public String WSType  = "png";
+    public bool WSSmooth  = false;
+    public bool WSAverage = false;
 
-    // Internal
-    bool kinect = false;
-    WSRMicro wsr = null;
+    // ==========================================
+    //  GETTER / SETTER
+    // ==========================================
+
+    public bool HasContext() {
+      return hasContext;
+    }
+
+    public String GetRemoteURL() {
+      return "http://" + server + ":" + port;
+    }
+
+    public String getDirectory() {
+      if (directories == null) {
+        return "";
+      }
+      return directories[0];
+    }
 
     // ==========================================
     //  CONSTRUCTOR
     // ==========================================
+
+    // Singleton
+    private static WSRConfig config;
+    public  static WSRConfig GetInstance() {
+      if (config == null) {
+        config = new WSRConfig();
+      }
+      return config;
+    }
 
     OptionSet options;
     private WSRConfig() {
@@ -76,59 +137,18 @@ namespace net.encausse.sarah {
 
       // Build OptionSet
       this.options = new OptionSet() {
-        { "d|directory=", "the {DIRECTORY} of grammar. (default is /macros)", v => directories.Add (v) },
-        { "ctx|context=",  "the starting context files", v => context.Add (v) },
-        
-        { "t|trigger=", "the Grammar {CONFIDENCE TRIGGER}. (default is 0.92)", v => trigger = double.Parse(v, culture) },
-        { "c|confidence=", "the Grammar {CONFIDENCE}. (default is 0.75)", v => confidence = double.Parse(v, culture) },
-        { "dictation=", "the Grammar {CONFIDENCE} for dictation. (default is 0.40)", v => dictation = double.Parse(v, culture) },
-        { "l|loopback=", "the local {PORT}. (default is 8088)", v => loopback = int.Parse(v, culture) },
-        { "rtp=", "the rtp {PORT}. (default is 7887)", v => rtpport = int.Parse(v, culture) },
-        { "language",  "the recognition engine {LANGUAGE}", v => language = v },
-        { "debug",  "display more debug data", v => DEBUG = v != null },
-
+        { "k|kinect",  "the {KINECT} mode. (default is false)", v => IsKinect = v != null },
+        { "audio",  "the {KINECT} audio mode only.", v => SpeechOnly = v != null },
         { "s|server=", "the NodeJS {SERVER}. (default is 127.0.0.1)", v => server = v },
         { "p|port=", "the NodeJS {PORT}. (default is 8080)", v => port = v },
-        
-        { "k|kinect",  "the {KINECT} mode. (default is false)", v => kinect = v != null },
-        { "g|gesture", "the {KINECT} gesture mode. (default is false)", v => gesture = v != null },
-        { "seated",    "the {KINECT} gesture seated mode. (default is false)", v => seated = v != null },
-        { "f|picture", "the {KINECT} picture mode. (default is false)", v => picture = v != null },
-        { "h|help",  "show this message and exit", v => help = v != null },
-        
-        { "sck|websocket=",  "the websocket server port (should be 7777)", v => websocket = int.Parse(v, culture) },
-        { "websocktype=",    "the websocket image format (jpg/png)", v => websocktype = v }
+        { "d|directory=", "the {DIRECTORY} of grammar. (default is /macros)", v => directories.Add (v) },
+        { "t|trigger=", "the Grammar {CONFIDENCE TRIGGER}. (default is 0.92)", v => trigger = double.Parse(v, culture) },
+        { "c|confidence=", "the Grammar {CONFIDENCE}. (default is 0.75)", v => confidence = double.Parse(v, culture) },
+        { "l|loopback=", "the local {PORT}. (default is 8088)", v => loopback = int.Parse(v, culture) },
+        { "language",  "the recognition engine {LANGUAGE}", v => language = v },
+        { "debug",  "display more debug data", v => DEBUG = v != null },
+        { "h|help",  "show this message and exit", v => help = v != null }
       };
-    }
-
-    // Singleton
-    private static WSRConfig config;
-    public static WSRConfig GetInstance() {
-      if (config == null) {
-        config = new WSRConfig();
-      }
-      return config;
-    }
-
-    // ==========================================
-    //  MICRO or KINECT
-    // ==========================================
-
-    public void SetupMicro(){
-      if (wsr != null) return;
-      logInfo("INIT", "==========================================");
-      logInfo("INIT", "S.A.R.A.H. => " + (IsKinect() ? "KINECT" : "MICRO"));
-      logInfo("INIT", "==========================================");
-      logInfo("INIT", "Server: " + GetRemoteURL());
-      logInfo("INIT", "Confidence: " + confidence);
-      logInfo("INIT", "==========================================");
-
-      wsr = config.IsKinect() ? new WSRKinect() : new WSRMicro();
-      // wsr.Init();
-    }
-
-    public WSRMicro GetWSRMicro() {
-      return wsr;
     }
 
     // ==========================================
@@ -153,7 +173,7 @@ namespace net.encausse.sarah {
 
       // Parsing done
       parse = true;
-      return this; 
+      return this;
     }
 
     private void ParseINI() {
@@ -167,33 +187,60 @@ namespace net.encausse.sarah {
             directories.Add(property.Value);
           }
           else if (section.Name == "context") {
-            context.Add(property.Value); 
+            context.Add(property.Value);
           }
-          else if (property.Key == "ctxTimeout") { ctxTimeout = int.Parse(property.Value); }
-          else if (property.Key == "restart")    { restart = int.Parse(property.Value); }
-          else if (property.Key == "name")       { name = property.Value; }
-          else if (property.Key == "trigger")    { trigger = double.Parse(property.Value, culture); }
-          else if (property.Key == "confidence") { confidence = double.Parse(property.Value, culture); }
-          else if (property.Key == "dictation")  { dictation = double.Parse(property.Value, culture); }
-          else if (property.Key == "adaptation") { adaptation = bool.Parse(property.Value); }
-          else if (property.Key == "loopback")   { loopback = int.Parse(property.Value, culture); }
-          else if (property.Key == "rtpport")    { rtpport = int.Parse(property.Value, culture); }
-          else if (property.Key == "language")   { language = property.Value;  }
-          else if (property.Key == "voice")      { voice = property.Value; }
-          else if (property.Key == "debug")      { DEBUG = bool.Parse(property.Value); }
-          else if (property.Key == "audio")      { audioWatcher = property.Value; }
-            
-          else if (property.Key == "server")     { server = property.Value; }
-          else if (property.Key == "port")       { port = property.Value; }
+          else if (property.Key == "debug")        { DEBUG       = bool.Parse(property.Value);}
+          else if (property.Key == "logfile")      { logfile     = property.Value; }
+          else if (property.Key == "udpport")      { udpport     = int.Parse(property.Value); }
+          else if (property.Key == "ctxTimeout")   { ctxTimeout  = int.Parse(property.Value); }
+          else if (property.Key == "restart")      { restart     = int.Parse(property.Value); }
+          else if (property.Key == "pitch")        { PitchDelta  = int.Parse(property.Value);  }
+          else if (property.Key == "name")         { name        = property.Value; }
+          else if (property.Key == "trigger")      { trigger     = double.Parse(property.Value, culture); }
+          else if (property.Key == "confidence")   { confidence  = double.Parse(property.Value, culture); }
+          else if (property.Key == "adaptation")   { Adaptation  = bool.Parse(property.Value); }
+          else if (property.Key == "loopback")     { loopback    = int.Parse(property.Value, culture); }
+          else if (property.Key == "rtpport")      { rtpport     = int.Parse(property.Value, culture); }
+          else if (property.Key == "fps")          { FPS         = int.Parse(property.Value, culture); }
+          else if (property.Key == "language")     { language    = property.Value; }
+          else if (property.Key == "voice")        { voice       = property.Value; }
+          else if (property.Key == "audio")        { audio       = property.Value; }
+          else if (property.Key == "server")       { server      = property.Value; }
+          else if (property.Key == "port")         { port        = property.Value; }
+          else if (property.Key == "speakers")     { Speakers    = property.Value; }
+          else if (property.Key == "only")         { SpeechOnly = bool.Parse(property.Value); }
+          else if (property.Key == "spVolTTS")     { SpkVolTTS   = int.Parse(property.Value);  }
+          else if (property.Key == "spVolPlay")    { SpkVolPlay  = int.Parse(property.Value);  }
+          else if (property.Key == "echo")         { Echo        = int.Parse(property.Value);  }
+          else if (property.Key == "kinect")       { IsKinect    = bool.Parse(property.Value); }
+          else if (property.Key == "seated")       { IsSeated    = bool.Parse(property.Value); }
+          else if (property.Key == "elevation")    { SensorElevation = int.Parse(property.Value); }
+          else if (property.Key == "gestureFix")   { GestureFix  = int.Parse(property.Value); }
+          else if (property.Key == "motionTH")     { MotionTH    = int.Parse(property.Value); }
+          else if (property.Key == "standby")      { StandBy     = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "motion")       { Motion      = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "gesture")      { Gesture     = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "gestureTH")    { GestureTH   = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "qrcode")       { QRCode      = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "qrcodeTH")     { QRCodeTH    = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "color")        { Color       = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "colorTH")      { ColorTH     = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "facedetec")    { FaceDetec   = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "facereco")     { FaceReco    = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "facetrack")    { FaceTrack   = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "faceTH")       { FaceTH      = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "facerepaint")  { FaceRepaint = TimeSpan.FromMilliseconds(int.Parse(property.Value)); }
+          else if (property.Key == "websocket")    { WebSocket   = int.Parse(property.Value, culture); }
+          else if (property.Key == "websockSmooth"){ WSSmooth    = bool.Parse(property.Value); }
+          else if (property.Key == "websockAvg")   { WSAverage   = bool.Parse(property.Value); }
+          else if (property.Key == "gestureSB")    { StandByGesture = bool.Parse(property.Value); }
+          else if (property.Key == "faceSB")       { StandByFace = bool.Parse(property.Value); }
+          else if (property.Key == "alternate")           { MaxAlternates              = int.Parse(property.Value); }
+          else if (property.Key == "initialSilence")      { InitialSilenceTimeout      = TimeSpan.FromSeconds(int.Parse(property.Value)); }
+          else if (property.Key == "babble")              { BabbleTimeout              = TimeSpan.FromSeconds(int.Parse(property.Value)); }
+          else if (property.Key == "endSilence")          { EndSilenceTimeout          = TimeSpan.FromSeconds(int.Parse(property.Value)); }
+          else if (property.Key == "endSilenceAmbiguous") { EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(int.Parse(property.Value)); }
 
-          else if (property.Key == "kinect")     { kinect = bool.Parse(property.Value); }
-          else if (property.Key == "gesture")    { gesture = bool.Parse(property.Value); }
-          else if (property.Key == "seated")     { seated = bool.Parse(property.Value); }
-          else if (property.Key == "picture")    { picture = bool.Parse(property.Value); }
-          else if (property.Key == "qrcode")     { qrcode = int.Parse(property.Value, culture); }
-          else if (property.Key == "facetrack")  { facetrack = int.Parse(property.Value, culture); }
-          else if (property.Key == "terminator") { terminator = bool.Parse(property.Value); }
-          else if (property.Key == "websocket")  { websocket = int.Parse(property.Value, culture); }
         }
       }
     }
@@ -214,7 +261,6 @@ namespace net.encausse.sarah {
         directories.Add("macros");
       }
 
-
       this.hasContext = context != null && context.Count > 0;
 
       return true;
@@ -225,45 +271,32 @@ namespace net.encausse.sarah {
     // ==========================================
 
     protected void ShowHelp(OptionSet p) {
-      Console.WriteLine("Usage: WSRLaunch [OPTIONS]+ message");
+      Console.WriteLine("Usage: {process} [OPTIONS]+ message");
       Console.WriteLine();
       Console.WriteLine("Options:");
       p.WriteOptionDescriptions(Console.Out);
     }
 
     // ==========================================
-    //  GETTER / SETTER
+    //  MICRO or KINECT
     // ==========================================
+    
+    // Internal
+    private bool IsKinect { get; set; }
+    public  WSRMicro WSR  { get; set; }
 
-    public bool IsKinect() {
-      return kinect;
-    }
+    public void Start(){
+      if (WSR != null) return;
 
-    public bool IsPictureMode() {
-      return picture;
-    }
+      logInfo("INIT", "==========================================");
+      logInfo("INIT", "S.A.R.A.H. => " + (IsKinect ? "KINECT" : "MICRO"));
+      logInfo("INIT", "==========================================");
+      logInfo("INIT", "Server: " + GetRemoteURL());
+      logInfo("INIT", "Confidence: " + confidence);
+      logInfo("INIT", "==========================================");
 
-    public bool IsGestureMode() {
-      return gesture;
-    }
-
-    public bool IsSeatedGesture() {
-      return seated;
-    }
-
-    public bool HasContext() {
-      return hasContext; 
-    }
-
-    public String GetRemoteURL() {
-      return "http://" + server + ":" + port;
-    }
-
-    public String getDirectory() {
-      if (directories == null) {
-        return "";
-      }
-      return directories[0];
+      WSR = config.IsKinect ? new WSRKinect() : new WSRMicro();
+      WSR.Init();
     }
 
     // ==========================================
@@ -275,35 +308,38 @@ namespace net.encausse.sarah {
 
       LoggingConfiguration config = new LoggingConfiguration();
       
-      // Build Targets ----------
+      // Console ----------
 
       ColoredConsoleTarget consoleTarget = new ColoredConsoleTarget();
       consoleTarget.Layout = "${date:format=HH\\:MM\\:ss} ${logger} ${message}";
 
-      FileTarget fileTarget = new FileTarget();
-      fileTarget.FileName = "${basedir}/${shortdate}.log";
-      fileTarget.Layout = "${message}";
-
-      var viewerTarget = new NLogViewerTarget() {
-        Name = "viewer",
-        Address = "udp://localhost:9999",
-        Layout = "${message}"
-      };
-      viewerTarget.Renderer.IncludeNLogData = false;
-
-      // Add Targets ----------
-
       config.AddTarget("console", consoleTarget);
-      config.AddTarget("file", fileTarget);
-      config.AddTarget("viewer", viewerTarget);
-
-      // Add Rules ----------
 
       LoggingRule rule1 = new LoggingRule("*", LogLevel.Debug, consoleTarget);
       config.LoggingRules.Add(rule1);
 
-      LoggingRule rule2 = new LoggingRule("*", LogLevel.Debug, fileTarget);
-      config.LoggingRules.Add(rule2);
+      // File ----------
+
+      if (null != logfile) {
+        FileTarget fileTarget = new FileTarget();
+        fileTarget.FileName = logfile;
+        fileTarget.Layout = "${message}";
+
+        config.AddTarget("file", fileTarget);
+
+        LoggingRule rule2 = new LoggingRule("*", LogLevel.Debug, fileTarget);
+        config.LoggingRules.Add(rule2);
+      }
+
+      // View ----------
+
+      var viewerTarget = new NLogViewerTarget() {
+        Name = "viewer",
+        Address = "udp://localhost:" + udpport,
+        Layout = "${message}"
+      };
+      viewerTarget.Renderer.IncludeNLogData = false;
+      config.AddTarget("viewer", viewerTarget);
 
       LoggingRule rule3 = new LoggingRule("*", LogLevel.Debug, viewerTarget);
       config.LoggingRules.Add(rule3);

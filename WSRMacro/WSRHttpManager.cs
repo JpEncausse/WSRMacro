@@ -4,6 +4,7 @@ using System.Net;
 using System.Text;
 
 using NHttp;
+using System.Web;
 
 namespace net.encausse.sarah {
 
@@ -22,37 +23,102 @@ namespace net.encausse.sarah {
     //  WSRMacro HTTP REQUEST
     // ==========================================
 
-    protected String CleanURL(String url) {
+    private bool working = false;
+    protected String CleanURL(string url) {
       return url.Replace("http://127.0.0.1:8080", WSRConfig.GetInstance().GetRemoteURL());
     }
 
-    public void SendRequest(String url) {
-      if (url == null) { return; }
-      url = CleanURL(url);
-      WSRConfig.GetInstance().logInfo("HTTP", "Build HttpRequest: " + url);
+    protected String AppendURL(string url, string param, string value) {
+      value = HttpUtility.UrlEncode(value);
+      if (url.IndexOf('?') < 0)
+        return url + "?" + param + "=" + value;
+      return url + (url.EndsWith("&") ? "" : "&") + param + "=" + value;
+    }
 
+    public void SendRequest(string url) {
+      if (url == null) { return; }
+      if (working) { return; }
+      
+      working = true;
+
+      // Clean URL
+      url = CleanURL(url);
+
+      // Append UserId
+      var profile = WSRProfileManager.GetInstance().Current;
+      if (null != profile){
+        url = AppendURL(url, "profile", profile.Name);
+      }
+
+      // Append Directory Path
+      url = AppendURL(url, "directory", WSRSpeechManager.GetInstance().GetGrammarPath());
+
+      WSRConfig.GetInstance().logInfo("HTTP", "Build HttpRequest: " + url);
       HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
       req.Method = "GET";
 
       WSRConfig.GetInstance().logInfo("HTTP", "Send HttpRequest: " + req.Address);
-
       try {
         HttpWebResponse res = (HttpWebResponse)req.GetResponse();
         using (StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8)) {
-          WSRSpeaker.GetInstance().Speak(sr.ReadToEnd(), true);
+          WSRSpeakerManager.GetInstance().Speak(sr.ReadToEnd(), false);
         }
       }
       catch (WebException ex) {
         WSRConfig.GetInstance().logError("HTTP", ex);
       }
+      working = false;
     }
 
-    public void SendRequest(String url, String path) {
-      if (url == null) { return; }
-      if (path == null) { SendRequest(url); return; }
+    public void SendPost(string url, string key, string value) {
+      SendPost(url, new String[] { key }, new String[] { value });
+    }
+
+    public void SendPost(string url, string[] keys, string[] values) {
+      if (url == null)  { return; }
+      if (keys == null || values == null) { return; }
+      if (working) { return; } working = true;
+
+      // Clean URL
       url = CleanURL(url);
 
-      WSRConfig.GetInstance().logInfo("HTTP", "Build HttpRequest: " + url);
+      // POST Data
+      StringBuilder postData = new StringBuilder();
+      for (int i=0; i < keys.Length; i++) {
+        postData.Append(keys[i] + "=" + HttpUtility.UrlEncode(values[i]) + "&");
+      }
+      ASCIIEncoding ascii = new ASCIIEncoding();
+      byte[] postBytes = ascii.GetBytes(postData.ToString());
+
+      // Build request
+      WSRConfig.GetInstance().logInfo("HTTP", "Build POSTRequest: " + url);
+      HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+      req.Method = "POST";
+      req.ContentType = "application/x-www-form-urlencoded";
+      req.ContentLength = postBytes.Length;
+
+      // Send POST data
+      WSRConfig.GetInstance().logInfo("HTTP", "Send POSTRequest: " + req.Address);
+      try {
+        Stream postStream = req.GetRequestStream();
+        postStream.Write(postBytes, 0, postBytes.Length);
+        postStream.Flush();
+        postStream.Close();
+      }
+      catch (WebException ex) {
+        WSRConfig.GetInstance().logError("HTTP", ex);
+      }
+      working = false;
+    }
+
+    public void SendUpoad(string url, string path) {
+      if (url == null) { return; }
+      if (path == null) { SendRequest(url); return; }
+
+      if (working) { return; } working = true;
+
+      url = CleanURL(url);
+      WSRConfig.GetInstance().logInfo("HTTP", "Build UploadRequest: " + url);
 
       WebClient client = new WebClient();
       client.Headers.Add("user-agent", "S.A.R.A.H. (Self Actuated Residential Automated Habitat)");
@@ -60,11 +126,12 @@ namespace net.encausse.sarah {
       try {
         byte[] responseArray = client.UploadFile(url, path);
         String response = System.Text.Encoding.ASCII.GetString(responseArray);
-        WSRSpeaker.GetInstance().Speak(response, true);
+        WSRSpeakerManager.GetInstance().Speak(response, false);
       }
       catch (Exception ex) {
         WSRConfig.GetInstance().logInfo("HTTP", "Exception: " + ex.Message);
       }
+      working = false;
     }
 
     // ==========================================
@@ -76,26 +143,35 @@ namespace net.encausse.sarah {
     public void StartHttpServer() {
 
       int port = WSRConfig.GetInstance().loopback;
+      IPAddress address = GetIpAddress();
 
       // 192.168.0.x
-      try {
-        http = new HttpServer();
-        http.EndPoint = new IPEndPoint(GetIpAddress(), port);
-        http.Start();
-        http.RequestReceived += this.http_RequestReceived;
-        WSRConfig.GetInstance().logInfo("INIT", "Starting Server: http://" + http.EndPoint + "/");
-      }
-      catch (Exception ex) {
-        http = null;
-        WSRConfig.GetInstance().logInfo("HTTP", "Exception: " + ex.Message);
+      if (address != null){
+        try {
+          http = new HttpServer();
+          http.EndPoint = new IPEndPoint(address, port);
+          http.Start();
+          http.RequestReceived += this.http_RequestReceived;
+          WSRConfig.GetInstance().logInfo("INIT", "Starting Server: http://" + http.EndPoint + "/");
+        }
+        catch (Exception ex) {
+          http = null;
+          WSRConfig.GetInstance().logInfo("HTTP", "Exception: " + ex.Message);
+        }
       }
 
       // Localhost
-      httpLocal = new HttpServer();
-      httpLocal.EndPoint = new IPEndPoint(IPAddress.Loopback, port);
-      httpLocal.RequestReceived += this.http_RequestReceived;
-      httpLocal.Start();
-      WSRConfig.GetInstance().logInfo("INIT", "Starting Server: http://" + httpLocal.EndPoint + "/");
+      try {
+        httpLocal = new HttpServer();
+        httpLocal.EndPoint = new IPEndPoint(IPAddress.Loopback, port);
+        httpLocal.RequestReceived += this.http_RequestReceived;
+        httpLocal.Start();
+        WSRConfig.GetInstance().logInfo("INIT", "Starting Server: http://" + httpLocal.EndPoint + "/");
+      }
+      catch (Exception ex) {
+        httpLocal = null;
+        WSRConfig.GetInstance().logInfo("HTTP", "Exception: " + ex.Message);
+      }
     }
 
     public void Dispose() {
@@ -117,17 +193,18 @@ namespace net.encausse.sarah {
           return ip;
         }
       }
-      return IPAddress.Loopback;
+      return null;
     }
 
     protected void http_RequestReceived(object sender, HttpRequestEventArgs e) {
       WSRConfig.GetInstance().logInfo("HTTP", "Request received: " + e.Request.Url.AbsoluteUri);
 
-      // Handle custom request
-      WSRConfig.GetInstance().GetWSRMicro().HandleCustomRequest(e);
-      
       // Fake response
       using (var writer = new StreamWriter(e.Response.OutputStream)) {
+
+        // Handle custom request
+        WSRConfig.GetInstance().WSR.HandleCustomRequest(e, writer);
+      
         writer.Write(" ");
         writer.Flush();
         writer.Close();

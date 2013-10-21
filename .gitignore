@@ -20,6 +20,8 @@ WSRMacro/dump
 WSRMacro/medias/Kinect*
 WSRMacro/Camera/TrainedFaces
 WSRMacro/plugins
+WSRMacro/profile/faces
+WSRMacro/profile.json
 
 # External tool builders
 .externalToolBuilders/

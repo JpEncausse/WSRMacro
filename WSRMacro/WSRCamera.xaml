@@ -1,21 +1,132 @@
 ﻿<Window x:Class="net.encausse.sarah.WSRCamera"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="WSR Kinect Camera" Width="840" Height="510" Loaded="WindowLoaded" ResizeMode="NoResize" ShowInTaskbar="False">
+        Title="WSR Kinect Camera" Width="900" Height="615" Loaded="WindowLoaded" ResizeMode="NoResize" ShowInTaskbar="False">
 
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
+        <Border Grid.Column="0" Width="640" Height="480" BorderThickness="1" BorderBrush="Black"  Margin="0" HorizontalAlignment="Right" VerticalAlignment="Top">
+            <Image Name="Image" Width="640" Height="480" Stretch="None" Panel.ZIndex="1" />
+        </Border>
+        <Border Name="ProminentColor"   Width="50"  Height="50"  Panel.ZIndex="2" HorizontalAlignment="Left" VerticalAlignment="Top" />
 
-        <Image Name="Image"   Width="640" Height="480" Stretch="None" Panel.ZIndex="1" />
+        <Grid Height="80" VerticalAlignment="Bottom" Margin="10,0,10,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Margin="0,0,10,0" BorderThickness="0,0,1,0" BorderBrush="Black">
+                <StackPanel>
+                    <TextBlock x:Name="label_Profile0" TextWrapping ="Wrap"  Text ="Name"   FontWeight ="Bold"  />
+                    <TextBlock x:Name="label_Pitch0"   TextWrapping ="Wrap"  Text ="Voice Pitch"  FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Head0"    TextWrapping ="Wrap"  Text ="Head (x,y,z)"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Mood0"    TextWrapping ="Wrap"  Text ="Mood"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Height0"  TextWrapping ="Wrap"  Text ="Height" FontWeight ="Normal"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Margin="0,0,10,0" BorderThickness="0,0,1,0" BorderBrush="Black">
+                <StackPanel>
+                    <TextBlock x:Name="label_Profile1" TextWrapping ="Wrap"  Text ="Name"   FontWeight ="Bold"  />
+                    <TextBlock x:Name="label_Pitch1"   TextWrapping ="Wrap"  Text ="Voice Pitch"  FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Head1"    TextWrapping ="Wrap"  Text ="Head (x,y,z)"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Mood1"    TextWrapping ="Wrap"  Text ="Mood"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Height1"  TextWrapping ="Wrap"  Text ="Height" FontWeight ="Normal"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Margin="0,0,10,0" BorderThickness="0,0,1,0" BorderBrush="Black">
+                <StackPanel>
+                    <TextBlock x:Name="label_Profile2" TextWrapping ="Wrap"  Text ="Name"   FontWeight ="Bold"  />
+                    <TextBlock x:Name="label_Pitch2"   TextWrapping ="Wrap"  Text ="Voice Pitch"  FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Head2"    TextWrapping ="Wrap"  Text ="Head (x,y,z)"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Mood2"    TextWrapping ="Wrap"  Text ="Mood"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Height2"  TextWrapping ="Wrap"  Text ="Height" FontWeight ="Normal"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Margin="0,0,10,0" BorderThickness="0,0,1,0" BorderBrush="Black">
+                <StackPanel>
+                    <TextBlock x:Name="label_Profile3" TextWrapping ="Wrap"  Text ="Name"   FontWeight ="Bold"  />
+                    <TextBlock x:Name="label_Pitch3"   TextWrapping ="Wrap"  Text ="Voice Pitch"  FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Head3"    TextWrapping ="Wrap"  Text ="Head (x,y,z)"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Mood3"    TextWrapping ="Wrap"  Text ="Mood"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Height3"  TextWrapping ="Wrap"  Text ="Height" FontWeight ="Normal"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="4" Margin="0,0,10,0" BorderThickness="0,0,0,0" BorderBrush="Black">
+                <StackPanel>
+                    <TextBlock x:Name="label_Profile4" TextWrapping ="Wrap"  Text ="Name"   FontWeight ="Bold"  />
+                    <TextBlock x:Name="label_Pitch4"   TextWrapping ="Wrap"  Text ="Voice Pitch"  FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Head4"    TextWrapping ="Wrap"  Text ="Head (x,y,z)"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Mood4"    TextWrapping ="Wrap"  Text ="Mood"   FontWeight ="Normal"/>
+                    <TextBlock x:Name="label_Height4"  TextWrapping ="Wrap"  Text ="Height" FontWeight ="Normal"/>
+                </StackPanel>
+            </Border>
+        </Grid>
         
-        <StackPanel Grid.Column="1" Margin="10">
-            <Button Content="Train Engine" Height="Auto" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0" Name="buttonTrain" Click="ButtonScreenshotClick" />
-            <TextBlock TextWrapping="Wrap" Text="Name :" Margin="0,10,0,0" FontWeight="Bold"/>
-            <TextBox x:Name="textBox_Name" Text="" Margin="0,0,0,0"/>
-            <Image x:Name="imageTrainedFace" Width="100" Height="100" Margin="0,10,0,0"/>
-        </StackPanel>
+        <GroupBox Grid.Column="1" Margin="10 0 10 10" VerticalAlignment="Top">
+            <GroupBox.Header>
+                <Label>Trainning</Label>
+            </GroupBox.Header>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="100"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel HorizontalAlignment="Left" Width="100">
+                    <TextBlock TextWrapping="Wrap" Text="Name :" Margin="0,0,0,0" FontWeight="Bold"/>
+                    <TextBox x:Name="textBox_Name" Text="" Margin="0,0,0,0"/>
+                    <Button Content="Train Engine" Margin="0,10,0,0" Height="Auto" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="buttonTrain" Click="ButtonScreenshotClick" />
+                </StackPanel>
+
+                <Border Grid.Column="1" BorderThickness="1" BorderBrush="Black" Width="100" Height="100" Margin="0,0,0,0" HorizontalAlignment="Right">
+                    <Image x:Name="imageTrainedFace" Width="100" Height="100"  />
+                </Border>
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Grid.Column="1" VerticalAlignment="Top" Margin="10,140,10,10">
+            <GroupBox.Header>
+                <Label>Data</Label >
+            </GroupBox.Header>
+            <StackPanel>
+                <TextBlock x:Name="label_Motion"  TextWrapping ="Wrap"  Text ="Motion :"   FontWeight ="Bold"/>
+                <TextBlock x:Name="label_Gesture" TextWrapping ="Wrap"  Text ="Gesture :"  FontWeight ="Bold"/>
+                <TextBlock x:Name="label_Height"  TextWrapping ="Wrap"  Text ="Height :"   FontWeight ="Bold"/>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Grid.Column="1" VerticalAlignment="Bottom" Margin="10,10,10,170">
+            <GroupBox.Header>
+                <Label>Options</Label >
+            </GroupBox.Header>
+            <StackPanel>
+                <CheckBox Name="Chx_Skeleton" IsChecked="True">Draw Skeleton</CheckBox>
+                <CheckBox Name="Chx_Depth" IsChecked="True">Show Depth</CheckBox>
+                <CheckBox Name="Chx_Color" IsChecked="True">Show Prominent Color</CheckBox>
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Grid.Column="1" VerticalAlignment="Bottom" Margin="10,0,10,10">
+            <GroupBox.Header>
+                <Label>Debug</Label>
+            </GroupBox.Header>
+            <StackPanel>
+                <TextBlock TextWrapping="Wrap" Name="AllFrameWatch" Text="All Frame : 0ms" Margin="0,0,0,0" FontWeight="Bold" HorizontalAlignment="Right" FontFamily="Courier New"/>
+                <TextBlock TextWrapping="Wrap" Name="MotionWatch" Text="Motion : 0ms" Margin="0,0,0,0" FontWeight="Bold" HorizontalAlignment="Right" FontFamily="Courier New"/>
+                <TextBlock TextWrapping="Wrap" Name="QRCodeWatch" Text="QRCode : 0ms" Margin="0,0,0,0" FontWeight="Bold" HorizontalAlignment="Right" FontFamily="Courier New"/>
+                <TextBlock TextWrapping="Wrap" Name="GestureWatch" Text="Gesture : 0ms" Margin="0,0,0,0" FontWeight="Bold" HorizontalAlignment="Right" FontFamily="Courier New"/>
+                <TextBlock TextWrapping="Wrap" Name="ColorWatch" Text="Color : 0ms" Margin="0,0,0,0" FontWeight="Bold" HorizontalAlignment="Right" FontFamily="Courier New"/>
+                <TextBlock TextWrapping="Wrap" Name="FaceDetecWatch" Text="Face Detection : 0ms" Margin="0,0,0,0" FontWeight="Bold" HorizontalAlignment="Right" FontFamily="Courier New"/>
+                <TextBlock TextWrapping="Wrap" Name="FaceRecoWatch" Text="Face Recognition : 0ms" Margin="0,0,0,0" FontWeight="Bold" HorizontalAlignment="Right" FontFamily="Courier New"/>
+                <TextBlock TextWrapping="Wrap" Name="FaceTrackWatch" Text="Face Tracking : 0ms" Margin="0,0,0,0" FontWeight="Bold" HorizontalAlignment="Right" FontFamily="Courier New"/>
+                <TextBlock TextWrapping="Wrap" Name="CamRepaintWatch" Text="Camera Repaint : 0ms" Margin="0,0,0,0" FontWeight="Bold" HorizontalAlignment="Right" FontFamily="Courier New"/>
+            </StackPanel>
+        </GroupBox>
     </Grid>
 </Window>

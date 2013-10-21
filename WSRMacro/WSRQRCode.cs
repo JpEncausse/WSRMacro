@@ -8,71 +8,64 @@ using System.Windows.Media.Imaging;
 using System.Threading.Tasks;
 using Microsoft.Kinect;
 using ZXing;
+using System.Windows;
 
 namespace net.encausse.sarah {
 
-  public class QRCodeManager {
+  public class QRCodeMatcher {
 
-    BarcodeReader reader = new BarcodeReader { 
-      AutoRotate = true, 
-      TryHarder = true, 
-      PossibleFormats = new List<BarcodeFormat> { BarcodeFormat.QR_CODE } 
-    };
-
-    // ==========================================
-    //  QRCODE MANAGER
-    // ==========================================
-
+    private BarcodeReader reader;
     private WriteableBitmap bitmap;
+    private int colorW, colorH;
 
-    private void fireQRCode(String match) {
-      ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).HandleQRCodeComplete(match);
-    }
+    // ==========================================
+    //  CONSTRUCTOR
+    // ==========================================
 
-    public bool SetupQRCode() {
-      if (WSRConfig.GetInstance().qrcode <= 0) {
-        return false;
-      }
-      WSRConfig.GetInstance().logInfo("QRCODE", "Starting QRCode manager");
-      return true;
+    public QRCodeMatcher(int colorW, int colorH) {
+
+      // Build Reader
+      reader = new BarcodeReader {
+        AutoRotate = true,
+        TryHarder = true,
+        PossibleFormats = new List<BarcodeFormat> { BarcodeFormat.QR_CODE }
+      };
+
+      // Build WriteableBitmap
+      this.colorW = colorW;
+      this.colorH = colorH;
     }
 
     // ==========================================
-    //  COLOR FRAME
+    //  MATCHER
     // ==========================================
 
-    Bitmap image = null;
-    public void SensorColorFrameReady(object sender, ColorImageFrameReadyEventArgs e) {
+    byte[] buffer = null;
+    byte[] flip   = null;
+    public String CheckQRCode(byte[] data) {
+      if (null == data) { return null; }
+      if (null == buffer) { buffer = new byte[data.Length]; }
+      if (null == flip)   { flip   = new byte[data.Length]; }
 
-      if (bitmap == null) {
-        bitmap = ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).NewColorBitmap();
+      Array.Copy(data, buffer, data.Length);
+      int offset = 0;
+      for (int y = 0; y < colorH; y++) {
+        for (int x = 0; x < colorW; x++) {
+          int nudge = (colorW - 1) * 4;
+          flip[offset + 0 + x * 4] = buffer[offset + 0 - x * 4 + nudge];
+          flip[offset + 1 + x * 4] = buffer[offset + 1 - x * 4 + nudge];
+          flip[offset + 2 + x * 4] = buffer[offset + 2 - x * 4 + nudge];
+          flip[offset + 3 + x * 4] = buffer[offset + 3 - x * 4 + nudge];
+        }
+        offset += 4 * colorW;
       }
 
-      CheckQRCode();
-    }
+      Result result = result = reader.Decode(flip, colorW, colorH, RGBLuminanceSource.BitmapFormat.BGRA32);
+      if (result == null) { return null; }
 
-    int threshold = 0;
-    public void CheckQRCode() {
-      if (threshold-- > 0) { return; } threshold = WSRConfig.GetInstance().qrcode;
-      if (image != null) { return; }
-
-      image = ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).GetColorPNG(bitmap, true);
-      Task.Factory.StartNew(() => {
-        CheckQRCodeAsync(image);
-        image.Dispose();
-        image = null;
-      });
-    }
-
-    public void CheckQRCodeAsync(Bitmap image) {
-
-      Result result = result = reader.Decode(image);
-      if (result == null) { return; }
-
-      String type  = result.BarcodeFormat.ToString();
+      String type   = result.BarcodeFormat.ToString();
       String match = result.Text;
-      WSRConfig.GetInstance().logInfo("QRCODE", "Type: " + type + " Content: " + match);
-      fireQRCode(match);
+      return match;
     }
   }
 }

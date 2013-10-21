@@ -1,1 +1,1 @@
-"%cd%\bin\Release\WSRMacro.exe" -d macros -d plugins -c 0.60 -k -f 
+start %cd%\bin\Release\WSRMacro_Kinect.exe  -kinect

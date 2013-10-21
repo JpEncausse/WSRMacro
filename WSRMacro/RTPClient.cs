@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -10,14 +11,13 @@ namespace net.encausse.sarah {
   /// <summary>
   /// Connects to an RTP stream and listens for data
   /// http://stackoverflow.com/questions/15886888/c-sharp-capture-rtp-stream-and-send-to-speech-recognition/15934124#15934124
-  /// ffmpeg -f dshow -i audio="Réseau de microphones (Kinect U" -f rtp rtp://127.0.0.1:7887
   /// </summary>
   public class RTPClient {
     private const int AUDIO_BUFFER_SIZE = 65536;
 
     private UdpClient client;
     private IPEndPoint endPoint;
-    private SpeechStreamer audioStream;
+    private Streamer audioStream;
     private bool writeHeaderToConsole = true;
     private bool listening = false;
     private int port;
@@ -26,7 +26,7 @@ namespace net.encausse.sarah {
     /// <summary>
     /// Returns a reference to the audio stream
     /// </summary>
-    public SpeechStreamer AudioStream {
+    public Streamer AudioStream {
       get { return audioStream; }
     }
     /// <summary>
@@ -52,7 +52,7 @@ namespace net.encausse.sarah {
       this.port = port;
 
       // Initialize the audio stream that will hold the data
-      audioStream = new SpeechStreamer(AUDIO_BUFFER_SIZE);
+      audioStream = new Streamer(AUDIO_BUFFER_SIZE);
 
       WSRConfig.GetInstance().logInfo("RTPClient", "Done");
     }
@@ -63,7 +63,7 @@ namespace net.encausse.sarah {
     public void StartClient() {
       // Create new UDP client. The IP end point tells us which IP is sending the data
       client = new UdpClient(port);
-      endPoint = new IPEndPoint(IPAddress.Loopback, port);
+      endPoint = new IPEndPoint(IPAddress.Broadcast, port);
       
       WSRConfig.GetInstance().logInfo("RTPClient", "Listening for packets on port " + port + "...");
 
@@ -102,15 +102,15 @@ namespace net.encausse.sarah {
           byte[] packet = client.Receive(ref endPoint);
 
           // Decode the header of the packet
-          int version = GetRTPHeaderValue(packet, 0, 1);
-          int padding = GetRTPHeaderValue(packet, 2, 2);
-          int extension = GetRTPHeaderValue(packet, 3, 3);
-          int csrcCount = GetRTPHeaderValue(packet, 4, 7);
-          int marker = GetRTPHeaderValue(packet, 8, 8);
+          int version     = GetRTPHeaderValue(packet, 0, 1);
+          int padding     = GetRTPHeaderValue(packet, 2, 2);
+          int extension   = GetRTPHeaderValue(packet, 3, 3);
+          int csrcCount   = GetRTPHeaderValue(packet, 4, 7);
+          int marker      = GetRTPHeaderValue(packet, 8, 8);
           int payloadType = GetRTPHeaderValue(packet, 9, 15);
           int sequenceNum = GetRTPHeaderValue(packet, 16, 31);
-          int timestamp = GetRTPHeaderValue(packet, 32, 63);
-          int ssrcId = GetRTPHeaderValue(packet, 64, 95);
+          int timestamp   = GetRTPHeaderValue(packet, 32, 63);
+          int ssrcId      = GetRTPHeaderValue(packet, 64, 95);
 
           if (writeHeaderToConsole) {
             WSRConfig.GetInstance().logDebug("RTPClient", 

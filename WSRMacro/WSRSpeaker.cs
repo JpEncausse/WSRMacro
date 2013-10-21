@@ -3,166 +3,276 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Diagnostics;
 using System.Speech.Synthesis;
+using System.Speech.AudioFormat;
+
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
+
 
 namespace net.encausse.sarah {
 
-  public class WSRSpeaker {
+
+  // ==========================================
+  //  MANAGER
+  // ==========================================
+
+  public class WSRSpeakerManager {
 
     // Singleton
-    private static WSRSpeaker manager;
-    public static WSRSpeaker GetInstance() {
+    private static WSRSpeakerManager manager;
+    public static WSRSpeakerManager GetInstance() {
       if (manager == null) {
-        manager = new WSRSpeaker();
+        manager = new WSRSpeakerManager();
       }
       return manager;
     }
 
-    private bool speaking = false;
-    public bool IsSpeaking() {
-      return speaking;
-    }
+    // Constructor
+    public WSRSpeakerManager(){
 
-    // ==========================================
-    //  WSRMacro CONSTRUCTOR
-    // ==========================================
+      // Enumerate all Speaker
+      if ("all" == WSRConfig.GetInstance().Speakers) {
+        int waveOutDevices = WaveOut.DeviceCount;
+        for (int n = 0; n < waveOutDevices; n++) {
 
-    protected WSRSpeaker() {
-
-      // Build synthesizer
-      synthesizer = new SpeechSynthesizer();
-      synthesizer.SetOutputToDefaultAudioDevice();
-      synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(synthesizer_SpeakCompleted);
-
-      foreach (InstalledVoice voice in synthesizer.GetInstalledVoices()) {
-        VoiceInfo info = voice.VoiceInfo;
-        WSRConfig.GetInstance().logInfo("TTS", "Name: " + info.Name + " Culture: " + info.Culture);
+          var cap = WaveOut.GetCapabilities(n);
+          WSRConfig.GetInstance().logInfo("TTS", "Add Speaker Device: " + n
+                                               + " Product: "  + cap.ProductName
+                                               + " Channels: " + cap.Channels
+                                               + " Playback: " + cap.SupportsPlaybackRateControl);
+          speakers.Add(new WSRSpeaker(n));
+        }
+        return;
       }
 
-      String v = WSRConfig.GetInstance().voice;
-      if (v != null && v.Trim() != "") {
-        WSRConfig.GetInstance().logInfo("TTS", "Select voice: " + v);
-        synthesizer.SelectVoice(v);
+      // Enumerate declared Speaker
+      foreach (var spkr in WSRConfig.GetInstance().Speakers.Split(',')) {
+        var idx = int.Parse(spkr);
+        var cap = WaveOut.GetCapabilities(idx);
+        WSRConfig.GetInstance().logInfo("TTS", "Add Speaker Device: " + idx
+                                              + " Product: " + cap.ProductName
+                                              + " Channels: " + cap.Channels
+                                              + " Playback: " + cap.SupportsPlaybackRateControl);
+        speakers.Add(new WSRSpeaker(idx));
       }
-      
     }
 
-    // ==========================================
-    //  WSRMacro SPEECH
-    // ==========================================
-
-    protected SpeechSynthesizer synthesizer = null;
     public bool Speak(String tts, bool async) {
 
-      if (tts == null) { return false; }
+      var name = WSRProfileManager.GetInstance().CurrentName();
+      tts = Regex.Replace(tts, "\\[name\\]", name, RegexOptions.IgnoreCase);
 
-      WSRConfig.GetInstance().logInfo("TTS", "Say: " + tts);
-      speaking = true;
-
-      // Build and speak a prompt.
-      PromptBuilder builder = new PromptBuilder();
-      builder.AppendText(tts);
-      if (async) {
-        synthesizer.SpeakAsync(builder);
+      Task last = null;
+      foreach (var speaker in speakers) {
+        last = Task.Factory.StartNew(() => speaker.Speak(tts, async));
       }
-      else {
-        synthesizer.Speak(builder);
-        speaking = false;
+      if (!async && null != last) { last.Wait(); }
+      return true;
+    }
+
+    public void ShutUp() {
+      foreach (var speaker in speakers) {
+        speaker.ShutUp();
+      }
+    }
+
+    public bool Play(string fileName) {
+      foreach (var speaker in speakers) {
+        Task.Factory.StartNew(() => speaker.Play(fileName));
       }
       return true;
     }
 
-    protected void synthesizer_SpeakCompleted(object sender, SpeakCompletedEventArgs e) {
+    public bool Stream(string url) {
+      foreach (var speaker in speakers) {
+        Task.Factory.StartNew(() => speaker.Stream(url));
+      }
+      return true;
+    }
+
+    public bool Stop(string fileName) {
+      foreach (var speaker in speakers) {
+        speaker.Stop(fileName);
+      }
+      return true;
+    }
+
+    public void Dispose() {
+      foreach (var speaker in speakers) {
+        speaker.Dispose();
+      }
+    }
+
+    private List<WSRSpeaker> speakers = new List<WSRSpeaker>();
+    public bool Speaking {
+      get {
+        bool speak = false;
+        foreach (var speaker in speakers) {
+          speak = speak || speaker.speaking;
+        }
+        return speak;
+      }
+      set { }
+    }
+  }
+
+  // ==========================================
+  //  SPEAKER
+  // ==========================================
+  
+  public class WSRSpeaker {
+
+    private int device;
+    private WaveOut WaveOutSpeech;
+    private SpeechSynthesizer synthesizer;
+    
+
+    // ------------------------------------------
+    //  CONSTRUCTOR
+    // ------------------------------------------
+
+    public WSRSpeaker(int device) {
+      this.device = device;
+
+      this.WaveOutSpeech = new WaveOut(WaveCallbackInfo.FunctionCallback());
+      this.WaveOutSpeech.DeviceNumber = device;
+
+      this.synthesizer = new SpeechSynthesizer();
+      this.synthesizer.SpeakCompleted += new EventHandler<SpeakCompletedEventArgs>(synthesizer_SpeakCompleted);
+      
+      // Enumerate Voices
+      foreach (InstalledVoice voice in synthesizer.GetInstalledVoices()) {
+        VoiceInfo info = voice.VoiceInfo;
+        WSRConfig.GetInstance().logInfo("TTS", "[" + device + "]" + "Name: " + info.Name + " Culture: " + info.Culture);
+      }
+      
+      // Select Voice
+      String v = WSRConfig.GetInstance().voice;
+      if (v != null && v.Trim() != "") {
+        WSRConfig.GetInstance().logInfo("TTS", "[" + device + "]" + "Select voice: " + v);
+        synthesizer.SelectVoice(v);
+      }
+    }
+
+    public void Dispose() {
+      WaveOutSpeech.Dispose();
+    }
+
+    private void RunSession(WaveOut WaveOut, WaveStream stream, string match) {
+      played.Add(match);
+      WSRConfig.GetInstance().logInfo("PLAYER", "[" + device + "]" + "Start Player");
+      Stopwatch timer = new Stopwatch(); timer.Start();
+      using (WaveChannel32 volumeStream = new WaveChannel32(stream)) {
+        volumeStream.Volume = match == "TTS" ? WSRConfig.GetInstance().SpkVolTTS / 100f : WSRConfig.GetInstance().SpkVolPlay / 100f;
+        WaveOut.Init(volumeStream);
+        WaveOut.Play();
+        while (stream.CurrentTime < stream.TotalTime && played.Contains(match) && timer.ElapsedMilliseconds < 1000 * 60 * 2) {
+          Thread.Sleep(100);
+        }
+        WaveOut.Stop();
+        stream.Dispose();
+      }
+
+      WSRConfig.GetInstance().logInfo("PLAYER", "[" + device + "]" + "End Player");
+      played.Remove(match);
+    }
+
+    // ==========================================
+    //  SPEECH
+    // ==========================================
+
+    public bool speaking = false;
+    public void Speak(String tts, bool async) {
+
+      if (tts == null) { return; }
+      if (speaking)    { return; }
+
+      WSRConfig.GetInstance().logInfo("TTS", "[" + device + "] " + "Say: " + tts);
+      speaking = true;
+      try {
+        // Build and speak a prompt.
+        PromptBuilder builder = new PromptBuilder();
+        builder.AppendText(tts);
+
+        // Setup buffer
+        using (var ms = new MemoryStream()) {
+          synthesizer.SetOutputToWaveStream(ms);
+          synthesizer.Speak(builder); // Synchronous
+          ms.Position = 0;
+          if (ms.Length > 0) {
+            RunSession(WaveOutSpeech, new WaveFileReader(ms), "TTS");
+          }
+        }
+      }
+      catch (Exception ex) {
+        WSRConfig.GetInstance().logError("TTS", ex);
+      }
       speaking = false;
     }
 
     public void ShutUp() {
-      synthesizer.Pause();
-      speaking = false;
+      Stop("TTS");
     }
 
+    protected void synthesizer_SpeakCompleted(object sender, SpeakCompletedEventArgs e) { }
+
     // ==========================================
-    //  WSRMacro PLAYER
+    //  PLAYER
     // ==========================================
 
     List<String> played = new List<String>();
-
     public bool Stop(string key) {
       if (key == null) { return false; }
       played.Remove(key);
       return true;
     }
 
-
-    public bool Play(string fileName) {
-
-      if (fileName == null) { return false; }
+    public void Play(string fileName) {
+      if (fileName == null) { return; }
       if (fileName.StartsWith("http")) {
-        return Stream(fileName);
+        Stream(fileName); return;
       }
+      if (!File.Exists(fileName)) { return; }
 
-      var tmp = fileName.ToLower();
-      bool wav = tmp.EndsWith(".wav") || tmp.EndsWith(".wma");
+      // Play WaveStream
+      bool wav = fileName.ToLower().EndsWith(".wav") || fileName.ToLower().EndsWith(".wma");
+      var reader = wav ? (WaveStream)new WaveFileReader(fileName)
+                       : (WaveStream)new Mp3FileReader(fileName);
 
-      speaking = true;
-      WSRConfig.GetInstance().logInfo("PLAYER", "Start MP3 Player");
-      using (var ms = File.OpenRead(fileName))
-      using (var reader = wav ? (WaveStream) new WaveFileReader(ms) : (WaveStream) new Mp3FileReader(ms))
-      using (var pcmStream = WaveFormatConversionStream.CreatePcmStream(reader))
-      using (var baStream = new BlockAlignReductionStream(pcmStream))
-      using (var waveOut = new WaveOut(WaveCallbackInfo.FunctionCallback())) {
-        waveOut.Init(baStream);
-        waveOut.Play();
-        played.Add(fileName);
-        while (baStream.CurrentTime < baStream.TotalTime && played.Contains(fileName)) {
-          Thread.Sleep(100);
-        }
-        played.Remove(fileName);
-        waveOut.Stop();
-      }
-      WSRConfig.GetInstance().logInfo("PLAYER", "End MP3 Player");
-      speaking = false;
-      return true;
+      WaveOut WaveOutPlay = new WaveOut(WaveCallbackInfo.FunctionCallback());
+      WaveOutPlay.DeviceNumber = device;
+      RunSession(WaveOutPlay, reader, fileName);
+      WaveOutPlay.Dispose();
     }
 
-    public bool Stream(string url) {
+    public void Stream(string url) {
+      if (url == null) { return; }
 
-      if (url == null) { return false; }
-
-      speaking = true;
-      WSRConfig.GetInstance().logInfo("PLAYER", "Stream MP3 Player");
-
-      var tmp = url.ToLower();
-      bool wav = tmp.EndsWith(".wav") || tmp.EndsWith(".wma");
+      WaveOut WaveOutPlay = new WaveOut(WaveCallbackInfo.FunctionCallback());
+      WaveOutPlay.DeviceNumber = device;
 
       using (var ms = new MemoryStream())
       using (var stream = WebRequest.Create(url).GetResponse().GetResponseStream()) {
-        byte[] buffer = new byte[32768];
-        int read;
+        byte[] buffer = new byte[32768]; int read;
         while ((read = stream.Read(buffer, 0, buffer.Length)) > 0) {
           ms.Write(buffer, 0, read);
         }
         ms.Position = 0;
-        using (var reader = wav ? (WaveStream)new WaveFileReader(ms) : (WaveStream)new Mp3FileReader(ms))
-        using (var pcmStream = WaveFormatConversionStream.CreatePcmStream(reader))
-        using (var baStream = new BlockAlignReductionStream(pcmStream))
-        using (var waveOut = new WaveOut(WaveCallbackInfo.FunctionCallback())) {
-          waveOut.Init(baStream);
-          waveOut.Play();
-          played.Add(url);
-          while (baStream.CurrentTime < baStream.TotalTime && played.Contains(url)) {
-            Thread.Sleep(100);
-          }
-          played.Remove(url);
-          waveOut.Stop();
-        }
+
+        // Play WaveStream
+        bool wav = url.ToLower().EndsWith(".wav") || url.ToLower().EndsWith(".wma");
+        var reader = wav ? (WaveStream)new WaveFileReader(ms)
+                         : (WaveStream)new Mp3FileReader(ms);
+        
+        RunSession(WaveOutPlay, reader, url);
       }
 
-      WSRConfig.GetInstance().logInfo("PLAYER", "End MP3 Player");
-      speaking = false;
-      return true;
+      WaveOutPlay.Dispose();
     }
   }
 }

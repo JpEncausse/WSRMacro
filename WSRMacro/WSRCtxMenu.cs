@@ -18,7 +18,7 @@ namespace net.encausse.sarah {
       ToolStripMenuItem item;
 
       // WSRMacro Hook
-      WSRConfig.GetInstance().GetWSRMicro().HandleCtxMenu(menu);
+      WSRConfig.GetInstance().WSR.HandleCtxMenu(menu);
 
       // Separator.
       ToolStripSeparator sep;
@@ -40,7 +40,7 @@ namespace net.encausse.sarah {
     // ==========================================
 
     void Exit_Click(object sender, EventArgs e) {
-      WSRConfig.GetInstance().GetWSRMicro().Dispose();
+      WSRConfig.GetInstance().WSR.Dispose();
       Application.Exit();
     }
   }

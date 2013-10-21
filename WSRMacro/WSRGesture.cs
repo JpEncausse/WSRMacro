@@ -1,9 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Xml;
 using Microsoft.Kinect;
+using System.Drawing;
 
+// Inspired by:
+// http://channel9.msdn.com/coding4fun/kinect/A-Simple-Gesture-Processing-Framework-for-the-Kinect-For-Windows
 namespace net.encausse.sarah {
 
   // ==========================================
@@ -90,7 +94,6 @@ namespace net.encausse.sarah {
     }
   }
 
-
   // ==========================================
   //  GESTURE COMPONENT
   // ==========================================
@@ -135,7 +138,7 @@ namespace net.encausse.sarah {
         JointType join = (JointType)(Enum.Parse(typeof(JointType), j1));
         component.Joint1 = join;
       }
-
+      
       var j2 = reader.GetAttribute("secondJoint");
       if (j2 != null) {
         JointType join = (JointType)(Enum.Parse(typeof(JointType), j2));
@@ -261,6 +264,11 @@ namespace net.encausse.sarah {
       var sjoint1 = skeleton.Joints[component.Joint1]; //.ScaleTo(xScale, yScale);
       var sjoint2 = skeleton.Joints[component.Joint2]; //.ScaleTo(xScale, yScale);
 
+      if (sjoint1.TrackingState == JointTrackingState.Inferred ||
+          sjoint1.TrackingState == JointTrackingState.Inferred) {
+        return false;
+      }
+
       if (!isBegin) {
         isBegin = CompareJointRelationship(sjoint1, sjoint2, component.Begin);
       }
@@ -364,38 +372,23 @@ namespace net.encausse.sarah {
 
     public int gestureResetTimeout = 500;
     public List<Gesture> gestures = new List<Gesture>();
-    private Dictionary<int, GestureStateUser> userMap = new Dictionary<int, GestureStateUser>();
-
-    public GestureManager() {}
-
-    bool started = false;
-
-    public void Recognize(bool start) {
-
-      KinectSensor sensor = ((WSRKinect) WSRConfig.GetInstance().GetWSRMicro()).Sensor;
-      if (start && !started) {
-        WSRConfig.GetInstance().logInfo("KINECT", "Starting Skeleton seated: " + WSRConfig.GetInstance().IsSeatedGesture());
-        sensor.SkeletonFrameReady += SensorSkeletonFrameReady;
-        started = true;
-      }
-      else if (!start && started) {
-        WSRConfig.GetInstance().logInfo("KINECT", "Stoping Skeleton seated: " + WSRConfig.GetInstance().IsSeatedGesture());
-        sensor.SkeletonFrameReady -= SensorSkeletonFrameReady;
-        started = false;
-      }
-    }
-
-    // ------------------------------------------
-    //  Event
-    // ------------------------------------------
-
-    private void fireGesture(Gesture gesture) {
-      ((WSRKinect)WSRConfig.GetInstance().GetWSRMicro()).HandleGestureComplete(gesture);
+    private Dictionary<String, GestureStateUser> userMap = new Dictionary<String, GestureStateUser>();
+    
+    private WSRKinectSensor Sensor;
+    public GestureManager(WSRKinectSensor sensor) {
+      this.Sensor = sensor;
     }
 
     // ------------------------------------------
     //  Load gesture
     // ------------------------------------------
+
+    public void Load() {
+      foreach (string directory in WSRConfig.GetInstance().directories) {
+        DirectoryInfo d = new DirectoryInfo(directory);
+        LoadGestures(d);
+      }
+    }
 
     public void LoadGesture(String file, String name) {
       WSRConfig.GetInstance().logInfo("GESTURE", "Load file: " + name + " : " + file);
@@ -445,68 +438,121 @@ namespace net.encausse.sarah {
     //  Skeleton
     // ------------------------------------------
 
-    protected int playerId;
     protected Gesture match; // the current matching gesture
-    protected DateTime threshold = DateTime.Now;
+    public Skeleton Skeleton = null;
 
-    public void SensorSkeletonFrameReady(object sender, SkeletonFrameReadyEventArgs e) {
-      using (SkeletonFrame skeletonFrameData = e.OpenSkeletonFrame()) {
-        if (skeletonFrameData == null) {
-          return;
+    public Gesture CheckGestures(Skeleton[] skeletons) {
+
+      // Clean Prefetch
+      Skeleton = null;
+
+      if (null == skeletons) { return null; }
+      foreach (Skeleton sd in skeletons) {
+
+        // Too large array
+        if (sd == null) { continue; }
+
+        // If this skeleton is no longer being tracked, skip it
+        if (sd.TrackingState != SkeletonTrackingState.Tracked) {
+          continue;
         }
 
-        var allSkeletons = new Skeleton[skeletonFrameData.SkeletonArrayLength];
-        skeletonFrameData.CopySkeletonDataTo(allSkeletons);
+        // Prefetch some 
+        Prefetch(sd);
 
-        foreach (Skeleton sd in allSkeletons) {
+        // Validate all joints some data
+        if (!Viewport(sd)) { continue; }
+        Skeleton = sd;
 
-          // If this skeleton is no longer being tracked, skip it
-          if (sd.TrackingState != SkeletonTrackingState.Tracked) {
-            continue;
-          }
-          
-          // If there is not already a gesture state map for this skeleton, then create one
-          if (!userMap.ContainsKey(sd.TrackingId)) {
-            var user = new GestureStateUser(gestures);
-            userMap.Add(sd.TrackingId, user);
-          }
-
-          // WSRConfig.GetInstance().logDebug("GESTURE", "Skeleton " + sd.Position.X + "," + sd.Position.Y + "," + sd.Position.Z);
-          Gesture gesture = userMap[sd.TrackingId].Evaluate(sd);
-          if (gesture != null) {
-            WSRConfig.GetInstance().logInfo("GESTURE", "Active User Gesture complete: " + gesture.Description);
-
-            // Store the Gesture matching the most components
-            if (match == null || match.Components.Count <= gesture.Components.Count) {
-              match = gesture;
-            }
-
-            // Do not fire immediatly, wait a little bit
-            // Go go go
-            fireGesture(match);
-            userMap[playerId].ResetAll();
-            match = null;
-          }
-
-          // This break prevents multiple player data from being confused during evaluation.
-          // If one were going to dis-allow multiple players, this trackingId would facilitate
-          // that feat.
-          playerId = sd.TrackingId;
+        // If there is not already a gesture state map for this skeleton, then create one
+        if (!userMap.ContainsKey("P_"+sd.TrackingId)) {
+          var user = new GestureStateUser(gestures);
+          userMap.Add("P_"+sd.TrackingId, user);
         }
+
+
+        Gesture gesture = userMap["P_" + sd.TrackingId].Evaluate(sd);
+        if (null != gesture) {
+
+          // Store the Gesture matching the most components
+          if (match == null || match.Components.Count <= gesture.Components.Count) {
+            match = gesture;
+          }
+
+          // Do not fire immediatly, wait a little bit
+          Gesture g = MatchGesture();
+          if (g != null) { return g; }
+        }
+
+        break; // The skeleton match
       }
 
-      // Reset threshold
-      if ((DateTime.Now - threshold).TotalMilliseconds > 1000){
-        threshold = DateTime.Now;
+      // At last return gesture or null
+      return MatchGesture();
+    }
 
-        // Fire the latest matching gesture on threshold
-        if (match != null) {
-          fireGesture(match);
-          userMap[playerId].ResetAll();
-          match = null;
-        }
+    protected DateTime Threshold = DateTime.Now;
+    protected Gesture MatchGesture() {
+      
+      // Wait for a given amount of time
+      if ((DateTime.Now - Threshold).TotalMilliseconds < 1000) { return null; }
+
+      // Reset threashold
+      Threshold = DateTime.Now;
+
+      if (Skeleton != null && userMap.ContainsKey("P_" + Skeleton.TrackingId)) {
+        userMap["P_"+Skeleton.TrackingId].ResetAll();
       }
 
+      // No match
+      Gesture g = match;
+      if (null == g){ return null; }
+
+      // Clean and match
+      match = null;
+      return g;
+    }
+
+    // ------------------------------------------
+    //  Pre Fetch
+    // ------------------------------------------
+
+    protected bool Viewport(Skeleton sk) {
+      
+      bool track = sk.Joints[JointType.Head].TrackingState == JointTrackingState.Tracked
+                && sk.Joints[JointType.WristLeft].TrackingState == JointTrackingState.Tracked
+                && sk.Joints[JointType.WristRight].TrackingState == JointTrackingState.Tracked
+                && sk.Joints[JointType.HipLeft].TrackingState == JointTrackingState.Tracked
+                && sk.Joints[JointType.HipRight].TrackingState == JointTrackingState.Tracked;
+
+      if (track) {
+        var head   = sk.Joints[JointType.Head].Position;
+        var kludge = sk.Joints[JointType.FootLeft].Position;
+        var diff = Math.Abs(head.Y - kludge.Y) * 100;
+        track = diff > WSRConfig.GetInstance().GestureFix;
+        // WSRConfig.GetInstance().logInfo("GESTURE", " Kludge: " + diff + "cm");
+      }
+
+      return track;
+    }
+
+    
+    protected void Prefetch(Skeleton sk) {
+
+      // Store head in milimeters like depth
+      var head = sk.Joints[JointType.Head];
+      if (head.TrackingState == JointTrackingState.Tracked) {
+        var pos = head.Position;
+        WSRProfileManager.GetInstance().UpdateHead(pos.X * 1000f, pos.Y * 1000f, pos.Z * 1000f);
+      }
+
+      // Store height in m
+      Joint p1 = sk.Joints[JointType.ElbowLeft];
+      Joint p2 = sk.Joints[JointType.WristLeft];
+      if (p1.TrackingState == JointTrackingState.Tracked && p2.TrackingState == JointTrackingState.Tracked) {
+        var height = Math.Round((SkeletalExtensions.Length(p1, p2) * 100 * 5.27 + 6 + 42.05) / 100, 2);
+        WSRProfileManager.GetInstance().UpdateHeight(height);
+      }
     }
   }
 }

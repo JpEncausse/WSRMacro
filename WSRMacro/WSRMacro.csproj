@@ -59,6 +59,13 @@
     <ApplicationIcon>Resources\Home.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="ListExtensions.cs" />
+    <Compile Include="PitchTracker\CircularBuffer.cs" />
+    <Compile Include="PitchTracker\Extensions.cs" />
+    <Compile Include="PitchTracker\IIRFilter.cs" />
+    <Compile Include="PitchTracker\PitchDsp.cs" />
+    <Compile Include="PitchTracker\PitchTracker.cs" />
+    <Compile Include="StopwatchAvg.cs" />
     <Compile Include="CodeBits\IniFile.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
@@ -66,33 +73,43 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="RTPClient.cs" />
-    <Compile Include="SpeechStreamer.cs" />
+    <Compile Include="SkeletalExtensions.cs" />
+    <Compile Include="Streamer.cs" />
     <Compile Include="WSRCamera.xaml.cs">
       <DependentUpon>WSRCamera.xaml</DependentUpon>
     </Compile>
+    <Compile Include="WSRColor.cs" />
     <Compile Include="WSRConfig.cs" />
     <Compile Include="WSRCtxMenu.cs" />
+    <Compile Include="WSRDepth.cs" />
     <Compile Include="WSRFaceRecognition.cs" />
     <Compile Include="WSRGesture.cs" />
     <Compile Include="WSRHttpManager.cs" />
     <Compile Include="WSRKeyboard.cs" />
     <Compile Include="WSRKinect.cs" />
+    <Compile Include="WSRKinectSensor.cs" />
     <Compile Include="WSRMain.cs" />
     <Compile Include="WSRMicro.cs" />
+    <Compile Include="WSRProfileManager.cs" />
     <Compile Include="WSRQRCode.cs" />
     <Compile Include="WSRSpeaker.cs" />
-    <Compile Include="WSRSpeech.cs" />
+    <Compile Include="WSRSpeechManager.cs" />
     <Compile Include="WSRSpeechEngine.cs" />
     <Compile Include="WSRTrayMenu.cs" />
     <Compile Include="WSRWebSocket.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Camera\haarcascade_frontalface_alt_tree.xml" />
+    <Content Include="profile\haarcascade_frontalface_alt_tree.xml" />
+    <Content Include="FaceTrackData.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="FaceTrackLib.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="macros\time_en_US.xml">
       <SubType>Designer</SubType>
     </Content>
     <Content Include="plugins\allocine\allocine.xml" />
-    <Content Include="plugins\blague\blague.xml" />
     <Content Include="plugins\blink\blink.xml" />
     <Content Include="plugins\calendar\calendar.xml" />
     <Content Include="plugins\chatterbot\lazyChatterbot.xml">
@@ -114,7 +131,10 @@
     <Content Include="plugins\gesture\gesture.xml">
       <SubType>Designer</SubType>
     </Content>
-    <Content Include="plugins\karotz\karotz.xml" />
+    <Content Include="plugins\hue\hue.xml" />
+    <Content Include="plugins\karotz\karotz.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="plugins\kinect\kinect.xml" />
     <Content Include="plugins\mail\mail.xml" />
     <Content Include="plugins\meteo\meteo.xml" />
@@ -124,10 +144,9 @@
     </None>
     <Content Include="plugins\simsimi\lazySimsimi.xml" />
     <Content Include="plugins\simsimi\simsimi.xml" />
-    <Content Include="plugins\stationMeteoOpenpicus\stationMeteoOpenpicus.xml" />
+    <Content Include="plugins\test\test.xml" />
     <Content Include="plugins\translate\lazyTranslate.xml" />
     <Content Include="plugins\translate\translate.xml" />
-    <Content Include="plugins\vera\vera.xml" />
     <Content Include="plugins\werewolf\werewolf.xml">
       <SubType>Designer</SubType>
     </Content>
@@ -179,9 +198,9 @@
     <Reference Include="Emgu.Util">
       <HintPath>dll\Emgu.Util.dll</HintPath>
     </Reference>
-    <Reference Include="Fleck, Version=0.9.6.19, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="Fleck, Version=0.9.7.22, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Fleck.0.9.6.19\lib\net40\Fleck.dll</HintPath>
+      <HintPath>..\packages\Fleck.0.9.7.22\lib\net40\Fleck.dll</HintPath>
     </Reference>
     <Reference Include="ImageResizer">
       <HintPath>..\packages\ImageResizer.3.3.3\lib\ImageResizer.dll</HintPath>
@@ -197,11 +216,15 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Program Files\Microsoft SDKs\Speech\v11.0\Assembly\Microsoft.Speech.dll</HintPath>
     </Reference>
-    <Reference Include="NAudio">
+    <Reference Include="NAudio, Version=1.6.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\NAudio.1.6\lib\net20\NAudio.dll</HintPath>
     </Reference>
     <Reference Include="NDesk.Options">
       <HintPath>..\packages\NDesk.Options.0.2.1\lib\NDesk.Options.dll</HintPath>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.5.0.6\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
     <Reference Include="NHttp, Version=0.1.6.0, Culture=neutral, PublicKeyToken=156364e4f7b202d9, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -276,6 +299,16 @@
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Service References\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="C:\Program Files\Microsoft SDKs\Kinect\Developer Toolkit v1.8.0\Samples\C#\Microsoft.Kinect.Toolkit.FaceTracking\Microsoft.Kinect.Toolkit.FaceTracking.csproj">
+      <Project>{1bcf9cee-df01-430e-b49d-41a9a88963eb}</Project>
+      <Name>Microsoft.Kinect.Toolkit.FaceTracking</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Program Files\Microsoft SDKs\Kinect\Developer Toolkit v1.8.0\Samples\C#\Microsoft.Kinect.Toolkit\Microsoft.Kinect.Toolkit.csproj">
+      <Project>{c6f9c31b-6130-4443-a5cc-ef0664552ecd}</Project>
+      <Name>Microsoft.Kinect.Toolkit</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

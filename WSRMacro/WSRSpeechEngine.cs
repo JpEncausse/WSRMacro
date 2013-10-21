@@ -3,7 +3,7 @@ using System.IO;
 using System.Web;
 using System.Xml.XPath;
 using System.Collections.Generic;
-
+using Pitch;
 #if MICRO
 using System.Speech;
 using System.Speech.Recognition;
@@ -49,47 +49,118 @@ namespace net.encausse.sarah {
       engine.AudioStateChanged  += new EventHandler<AudioStateChangedEventArgs>(recognizer_AudioStateChanged);
       engine.SpeechHypothesized += new EventHandler<SpeechHypothesizedEventArgs>(recognizer_SpeechHypothesized);
       engine.SpeechDetected     += new EventHandler<SpeechDetectedEventArgs>(recognizer_SpeechDetected);
-
-      engine.MaxAlternates = 2;
-      // engine.InitialSilenceTimeout = TimeSpan.FromSeconds(3);
-      // engine.BabbleTimeout = TimeSpan.FromSeconds(2);
-      // engine.EndSilenceTimeout = TimeSpan.FromSeconds(1);
-      // engine.EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(1.5);
       
-      if (!cfg.adaptation) {
+      engine.UpdateRecognizerSetting("CFGConfidenceRejectionThreshold", (int) (this.Confidence * 100));
+
+      engine.MaxAlternates              = cfg.MaxAlternates;
+      engine.InitialSilenceTimeout      = cfg.InitialSilenceTimeout;
+      engine.BabbleTimeout              = cfg.BabbleTimeout;
+      engine.EndSilenceTimeout          = cfg.EndSilenceTimeout;
+      engine.EndSilenceTimeoutAmbiguous = cfg.EndSilenceTimeoutAmbiguous;
+
+      if (!cfg.Adaptation) {
         engine.UpdateRecognizerSetting("AdaptationOn", 0);
       }
 
-      cfg.logDebug("ENGINE - " + Name, "MaxAlternates: " + engine.MaxAlternates);
-      cfg.logDebug("ENGINE - " + Name, "BabbleTimeout: " + engine.BabbleTimeout);
-      cfg.logDebug("ENGINE - " + Name, "InitialSilenceTimeout: " + engine.InitialSilenceTimeout);
-      cfg.logDebug("ENGINE - " + Name, "EndSilenceTimeout: " + engine.EndSilenceTimeout);
-      cfg.logDebug("ENGINE - " + Name, "EndSilenceTimeoutAmbiguous: " + engine.EndSilenceTimeoutAmbiguous);
+      cfg.logInfo("ENGINE - " + Name, "AudioLevel: "                 + engine.AudioLevel);
+      cfg.logInfo("ENGINE - " + Name, "MaxAlternates: "              + engine.MaxAlternates);
+      cfg.logInfo("ENGINE - " + Name, "BabbleTimeout: "              + engine.BabbleTimeout);
+      cfg.logInfo("ENGINE - " + Name, "InitialSilenceTimeout: "      + engine.InitialSilenceTimeout);
+      cfg.logInfo("ENGINE - " + Name, "EndSilenceTimeout: "          + engine.EndSilenceTimeout);
+      cfg.logInfo("ENGINE - " + Name, "EndSilenceTimeoutAmbiguous: " + engine.EndSilenceTimeoutAmbiguous);
+
+      tracker = new PitchTracker();
+      tracker.SampleRate = 16000.0f;
+      tracker.PitchDetected += OnPitchDetected;
     }
 
+    private DateTime loading = DateTime.MinValue;
     public void LoadGrammar() {
-      cfg.logInfo("GRAMMAR", Name + ": Load Grammar to Engine");
-      WSRSpeech.GetInstance().LoadGrammar(this);
+      if (this.Name == "RTP") { return; }
+      var cache = WSRSpeechManager.GetInstance().Cache;
+      foreach (WSRSpeecGrammar g in cache.Values) {
+        if (g.LastModified < loading) { continue; }
+        cfg.logInfo("GRAMMAR", Name + ": Load Grammar to Engine");
+        g.LoadGrammar(this);
+      }
+      loading = DateTime.Now;
+    }
+
+    // ------------------------------------------
+    //  PITCH TRACKER
+    // ------------------------------------------
+
+    PitchTracker tracker = null;
+    List<double> pitch = new List<double>();
+    private void OnPitchDetected(PitchTracker sender, PitchTracker.PitchRecord pitchRecord) {
+      // During the call to PitchTracker.ProcessBuffer, this event will be fired zero or more times,
+      // depending how many pitch records will fit in the new and previously cached buffer.
+      //
+      // This means that there is no size restriction on the buffer that is passed into ProcessBuffer.
+      // For instance, ProcessBuffer can be called with one large buffer that contains all of the
+      // audio to be processed, or just a small buffer at a time which is more typical for realtime
+      // applications. This PitchDetected event will only occur once enough data has been accumulated
+      // to do another detect operation.
+      /*
+      cfg.logInfo("PITCH", "MidiCents: " + pitchRecord.MidiCents
+                         + " MidiNote: " + pitchRecord.MidiNote
+                         + " Pitch: " + pitchRecord.Pitch
+                         + " RecordIndex: " + pitchRecord.RecordIndex);*/
+      double d = pitchRecord.Pitch;
+      if (d > 0) { pitch.Add(d); }
+    }
+
+    protected void TrackPitch(RecognitionResult rr) {
+      if (rr.Audio == null) { return;  }
+      using (MemoryStream audioStream = new MemoryStream()) {
+        rr.Audio.WriteToWaveStream(audioStream);
+        audioStream.Position = 0;
+
+        byte[] audioBytes = audioStream.ToArray();
+        float[] audioBuffer = new float[audioBytes.Length / 2];
+        for (int i = 0, j = 0; i < audioBytes.Length / 2; i += 2, j++) {
+
+          // convert two bytes to one short
+          short s = BitConverter.ToInt16(audioBytes, i);
+
+          // convert to range from -1 to (just below) 1
+          audioBuffer[j] = s / 32768.0f;
+        }
+
+        // Reset
+        tracker.Reset(); 
+        pitch.Clear();
+
+        // Process
+        tracker.ProcessBuffer(audioBuffer);
+
+        // Notify
+        WSRProfileManager.GetInstance().UpdatePitch(pitch.Mean());
+      }
     }
 
     // ==========================================
     //  VIRTUAL
     // ==========================================
 
-
     public virtual void HandleRequest(String url, String path) {
-      WSRHttpManager.GetInstance().SendRequest(url, path);
+      if (null != path) {
+        WSRHttpManager.GetInstance().SendUpoad(url, path);
+      }
+      else {
+        WSRHttpManager.GetInstance().SendRequest(url);
+      }
     }
 
     // ==========================================
     //  RECOGNIZE
     // ==========================================
 
-    protected void SpeechRecognized(RecognitionResult rr) {
+    protected void SpeechRecognized(RecognitionResult rr) { 
 
       // 1. Prevent while speaking
-      if (WSRSpeaker.GetInstance().IsSpeaking()) {
-        cfg.logWarning("ENGINE - " + Name, "REJECTED Speech while speaking: " + rr.Confidence + " Text: " + rr.Text);
+      if (WSRSpeakerManager.GetInstance().Speaking) {
+        cfg.logWarning("ENGINE - " + Name, "REJECTED Speech while speaking : " + rr.Confidence + " Text: " + rr.Text);
         return;
       }
 
@@ -100,10 +171,13 @@ namespace net.encausse.sarah {
       }
 
       // 3. Reset context timeout
-      WSRSpeech.GetInstance().ResetContextTimeout();
+      WSRSpeechManager.GetInstance().ResetContextTimeout();
+
+      // 3.5 Track Audio Pitch
+      TrackPitch(rr);
 
       // 4. Hook
-      String path = cfg.GetWSRMicro().HandleCustomAttributes(xnav);
+      String path = cfg.WSR.HandleCustomAttributes(xnav);
 
       // 5. Parse Result's URL
       String url = GetURL(xnav, rr.Confidence);
@@ -131,9 +205,6 @@ namespace net.encausse.sarah {
 
       // Append Confidence
       url += "confidence=" + ("" + confidence).Replace(",", ".") + "&";
-
-      // Append Directory Path
-      url += "directory=" + WSRSpeech.GetInstance().GetGrammarPath();
 
       return url;
     }
@@ -168,7 +239,7 @@ namespace net.encausse.sarah {
 
       double confidence = GetConfidence(xnav);
       if (rr.Confidence < confidence) {
-        cfg.logWarning("ENGINE - "+Name, "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Device: " + WSRSpeech.GetInstance().GetDeviceInfo(this) + " Text: " + rr.Text);
+        cfg.logWarning("ENGINE - "+Name, "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Device: " + " Text: " + rr.Text);
         return null;
       }
 
@@ -177,15 +248,16 @@ namespace net.encausse.sarah {
         return null;
       }
 
-      cfg.logWarning("ENGINE - "+Name, "RECOGNIZED Speech: " + rr.Confidence + " / " + rr.Words[0].Confidence + " (" + rr.Words[0].Text + ")" + " Device: " + WSRSpeech.GetInstance().GetDeviceInfo(this) + " Text: " + rr.Text);
+      cfg.logWarning("ENGINE - "+Name, "RECOGNIZED Speech: " + rr.Confidence + " / " + rr.Words[0].Confidence + " (" + rr.Words[0].Text + ")" + " Device: " + " Text: " + rr.Text);
       cfg.logDebug("ENGINE - "+Name, xnav.OuterXml);
 
-      if (cfg.DEBUG) { WSRSpeech.GetInstance().DumpAudio(rr); } 
+      if (cfg.DEBUG) { WSRSpeechManager.GetInstance().DumpAudio(rr); } 
 
       return xnav;
     }
 
     protected String HandleWildcard(RecognitionResult rr, String url) {
+      if (rr.Audio == null) { return url;  }
 
       XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
       XPathNavigator wildcard = xnav.SelectSingleNode("/SML/action/@dictation");
@@ -202,7 +274,7 @@ namespace net.encausse.sarah {
         rr.Audio.WriteToWaveStream(audioStream);
         // rr.GetAudioForWordRange(rr.Words[word], rr.Words[word]).WriteToWaveStream(audioStream);
         audioStream.Position = 0;
-        var speech2text = WSRSpeech.GetInstance().ProcessAudioStream(audioStream, language);
+        var speech2text = WSRSpeechManager.GetInstance().ProcessAudioStream(audioStream, language);
         if (url != null) {
           url += "&dictation=" + HttpUtility.UrlEncode(speech2text);
         }
@@ -215,11 +287,11 @@ namespace net.encausse.sarah {
     //  CALLBACK
     // ==========================================
 
-    protected bool IsWorking = false;
+    protected bool IsWorking { get; set; }
     protected void recognizer_SpeechRecognized(object sender, SpeechRecognizedEventArgs e) {
       RecognitionResult rr = e.Result;
 
-      if (!WSRSpeech.GetInstance().Listening) {
+      if (!WSRSpeechManager.GetInstance().Listening) {
         cfg.logInfo("ENGINE - " + Name, "REJECTED not listening");
         return;
       }
@@ -241,7 +313,7 @@ namespace net.encausse.sarah {
 
       IsWorking = false;
       var stop = DateTime.Now;
-      cfg.logInfo("ENGINE - " + Name, "SpeechRecognized: " + (stop - start).TotalMilliseconds + "ms");
+      cfg.logInfo("ENGINE - " + Name, "SpeechRecognized: " + (stop - start).TotalMilliseconds + "ms Text: "+ rr.Text);
     }
 
     protected void recognizer_RecognizeCompleted(object sender, RecognizeCompletedEventArgs e) {
@@ -255,7 +327,8 @@ namespace net.encausse.sarah {
       cfg.logDebug("ENGINE - " + Name, "AudioStateChanged (" + DateTime.Now.ToString("mm:ss.f") + "):" + e.AudioState);
     }
     protected void recognizer_SpeechHypothesized(object sender, SpeechHypothesizedEventArgs e) {
-      cfg.logDebug("ENGINE - " + Name, "recognizer_SpeechHypothesized");
+      cfg.logDebug("ENGINE - " + Name, "recognizer_SpeechHypothesized " + e.Result.Text + " => " + e.Result.Confidence);
+      
     }
     protected void recognizer_SpeechDetected(object sender, SpeechDetectedEventArgs e) {
       cfg.logDebug("ENGINE - " + Name, "recognizer_SpeechDetected");
@@ -276,9 +349,9 @@ namespace net.encausse.sarah {
       }
     }
 
-    public void Stop() {
+    public void Stop(bool dispose) {
       engine.RecognizeAsyncStop();
-      engine.Dispose();
+      if (dispose) { engine.Dispose(); }
       cfg.logInfo("ENGINE - " + Name, "Stop listening...done");
     }
   }
