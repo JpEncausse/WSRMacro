@@ -22,7 +22,8 @@ namespace net.encausse.sarah {
     private String logfile = null;
 
     // Grammar context
-    public String name = "SARAH";
+    public String Name = "SARAH";
+    public String Id   = "SARAH";
     public double trigger = 0.85;
     public double confidence = 0.70;
 
@@ -140,6 +141,8 @@ namespace net.encausse.sarah {
         { "k|kinect",  "the {KINECT} mode. (default is false)", v => IsKinect = v != null },
         { "audio",  "the {KINECT} audio mode only.", v => SpeechOnly = v != null },
         { "s|server=", "the NodeJS {SERVER}. (default is 127.0.0.1)", v => server = v },
+        { "name=", "the client name. (default is SARAH)", v => Name = v },
+        { "client=", "the client id. (default is SARAH)", v => Id = v },
         { "p|port=", "the NodeJS {PORT}. (default is 8080)", v => port = v },
         { "d|directory=", "the {DIRECTORY} of grammar. (default is /macros)", v => directories.Add (v) },
         { "t|trigger=", "the Grammar {CONFIDENCE TRIGGER}. (default is 0.92)", v => trigger = double.Parse(v, culture) },
@@ -195,7 +198,8 @@ namespace net.encausse.sarah {
           else if (property.Key == "ctxTimeout")   { ctxTimeout  = int.Parse(property.Value); }
           else if (property.Key == "restart")      { restart     = int.Parse(property.Value); }
           else if (property.Key == "pitch")        { PitchDelta  = int.Parse(property.Value);  }
-          else if (property.Key == "name")         { name        = property.Value; }
+          else if (property.Key == "name")         { Name        = property.Value; }
+          else if (property.Key == "client")       { Id          = property.Value; }
           else if (property.Key == "trigger")      { trigger     = double.Parse(property.Value, culture); }
           else if (property.Key == "confidence")   { confidence  = double.Parse(property.Value, culture); }
           else if (property.Key == "adaptation")   { Adaptation  = bool.Parse(property.Value); }
@@ -318,6 +322,9 @@ namespace net.encausse.sarah {
       LoggingRule rule1 = new LoggingRule("*", LogLevel.Debug, consoleTarget);
       config.LoggingRules.Add(rule1);
 
+      LoggingRule rule2 = new LoggingRule("*", LogLevel.Warn, consoleTarget);
+      config.LoggingRules.Add(rule2);
+
       // File ----------
 
       if (null != logfile) {
@@ -327,8 +334,11 @@ namespace net.encausse.sarah {
 
         config.AddTarget("file", fileTarget);
 
-        LoggingRule rule2 = new LoggingRule("*", LogLevel.Debug, fileTarget);
-        config.LoggingRules.Add(rule2);
+        LoggingRule rule3 = new LoggingRule("*", LogLevel.Debug, fileTarget);
+        config.LoggingRules.Add(rule3);
+
+        LoggingRule rule4 = new LoggingRule("*", LogLevel.Warn, fileTarget);
+        config.LoggingRules.Add(rule4);
       }
 
       // View ----------
@@ -341,8 +351,11 @@ namespace net.encausse.sarah {
       viewerTarget.Renderer.IncludeNLogData = false;
       config.AddTarget("viewer", viewerTarget);
 
-      LoggingRule rule3 = new LoggingRule("*", LogLevel.Debug, viewerTarget);
-      config.LoggingRules.Add(rule3);
+      LoggingRule rule5 = new LoggingRule("*", LogLevel.Debug, viewerTarget);
+      config.LoggingRules.Add(rule5);
+
+      LoggingRule rule6 = new LoggingRule("*", LogLevel.Warn, viewerTarget);
+      config.LoggingRules.Add(rule6);
 
       LogManager.ReconfigExistingLoggers();
       LogManager.Configuration = config;

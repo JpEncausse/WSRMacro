@@ -162,6 +162,13 @@ namespace net.encausse.sarah {
           writer.Write("speaking");
       }
 
+      // Askme
+      var values = System.Web.HttpUtility.ParseQueryString(e.Request.Url.Query);
+      var mgr = WSRSpeechManager.GetInstance();
+      String[] grammar = values.GetValues("grammar");
+      String[] tags = values.GetValues("tags");
+      WSRSpeechManager.GetInstance().DynamicGrammar(grammar,tags);
+
       // Stop Music
       String pause = e.Request.Params.Get("pause");
       if (pause != null) {
@@ -171,13 +178,7 @@ namespace net.encausse.sarah {
       // Play Music
       String mp3 = e.Request.Params.Get("play");
       if (mp3 != null) {
-        WSRSpeakerManager.GetInstance().Play(mp3); 
-      }
-
-      // Recognize String
-      String emulate = e.Request.Params.Get("emulate");
-      if (emulate != null) {
-        WSRSpeechManager.GetInstance().RecognizeString(emulate);
+        WSRSpeakerManager.GetInstance().Play(mp3, e.Request.Params.Get("sync") == null); 
       }
 
       // Recognize
@@ -265,6 +266,12 @@ namespace net.encausse.sarah {
         WSRKeyboard.GetInstance().SimulateTextEntry(keyText);
       }
 
+      // Recognize String
+      String emulate = e.Request.Params.Get("emulate");
+      if (emulate != null) {
+        WSRSpeechManager.GetInstance().RecognizeString(emulate);
+        writer.Write(WSRSpeakerManager.GetInstance().SpeechBuffer);
+      }
       return false;
     }
 
@@ -320,7 +327,7 @@ namespace net.encausse.sarah {
     protected void HandleTTS(XPathNavigator xnav) {
       XPathNavigator tts = xnav.SelectSingleNode("/SML/action/@tts");
       if (tts != null) {
-        WSRSpeakerManager.GetInstance().Speak(tts.Value, true);
+        WSRSpeakerManager.GetInstance().Speak(tts.Value, false);
       }
 
       XPathNavigator notts = xnav.SelectSingleNode("/SML/action/@notts");
@@ -332,7 +339,7 @@ namespace net.encausse.sarah {
     protected void HandlePlay(XPathNavigator xnav) {
       XPathNavigator play = xnav.SelectSingleNode("/SML/action/@play");
       if (play != null) {
-        WSRSpeakerManager.GetInstance().Play(play.Value);
+        WSRSpeakerManager.GetInstance().Play(play.Value, false);
       }
     }
 

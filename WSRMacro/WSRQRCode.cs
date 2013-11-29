@@ -65,6 +65,8 @@ namespace net.encausse.sarah {
 
       String type   = result.BarcodeFormat.ToString();
       String match = result.Text;
+
+      WSRConfig.GetInstance().logInfo("QRCode", "Type: " + type + " match: " + match);
       return match;
     }
   }

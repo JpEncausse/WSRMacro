@@ -110,23 +110,8 @@ namespace net.encausse.sarah {
     public void RecognizeString(String text) { 
 
       WSRSpeechEngine fileEngine = Engines["File"];
-      // fileEngine.GetEngine().EmulateRecognize(text); 
+      // fileEngine.GetEngine().EmulateRecognize(text);
       fileEngine.GetEngine().SimulateRecognize(text);
-
-
-      /*
-      System.Speech.Synthesis.SpeechSynthesizer synthesizer = new System.Speech.Synthesis.SpeechSynthesizer();
-      System.Speech.Synthesis.PromptBuilder builder = new System.Speech.Synthesis.PromptBuilder();
-      builder.AppendText(text);
-
-      using (var ms = new MemoryStream()) {
-        synthesizer.SetOutputToWaveStream(ms);
-        synthesizer.Speak(builder); // Synchronous
-        ms.Position = 0;
-        fileEngine.GetEngine().SetInputToWaveStream(ms);
-        fileEngine.GetEngine().Recognize()
-      }
-      */
     }
 
     // ==========================================
@@ -187,7 +172,7 @@ namespace net.encausse.sarah {
         // Load the XML
         logInfo("GRAMMAR", "Load file: " + name + " : " + file);
         String xml = File.ReadAllText(file, Encoding.UTF8);
-        xml = Regex.Replace(xml, "([^/])SARAH", "$1" + cfg.name, RegexOptions.IgnoreCase);
+        xml = Regex.Replace(xml, "([^/])SARAH", "$1" + cfg.Name, RegexOptions.IgnoreCase);
 
         // Check regexp language
         if (!Regex.IsMatch(xml, "xml:lang=\"" + cfg.language + "\"", RegexOptions.IgnoreCase)) {
@@ -223,6 +208,64 @@ namespace net.encausse.sarah {
       catch (Exception ex) {
         cfg.logError("GRAMMAR", ex);
       }
+    }
+
+
+    // ------------------------------------------
+    //  DYNAMIC GRAMMAR
+    // ------------------------------------------
+
+    public void DynamicGrammar(String[] grammar, String[] tags) {
+       if (!LoadXML(grammar,tags)) return;
+
+       SetContext("Dyn");
+       SetContextTimeout();
+       ForwardContext();
+       ResetContextTimeout();
+    }
+
+    protected bool LoadXML(String[] g, String[] tags) {
+      WSRConfig cfg = WSRConfig.GetInstance();
+
+      if (null == Engines)           { return false; }
+      if (null == g || null == tags) { return false; }
+      if (g.Length != tags.Length)   { return false; }
+
+      var xml  = "\n<grammar version=\"1.0\" xml:lang=\""+ cfg.language +"\" mode=\"voice\"  root=\"ruleDyn\" xmlns=\"http://www.w3.org/2001/06/grammar\" tag-format=\"semantics/1.0\">";
+          xml += "\n<rule id=\"ruleDyn\" scope=\"public\">";
+          xml += "\n<tag>out.action=new Object(); </tag>";
+          xml += "\n<one-of>";
+          for (var i = 0; i < g.Length; i++) {
+            logInfo("GRAMMAR", "Add to DynGrammar: " + g[i] + " => " + tags[i]);
+            xml += "\n<item>" + g[i] + "<tag>out.action.tag=\"" + tags[i] + "\"</tag></item>";
+          }
+          xml += "\n</one-of>";
+          xml += "\n<tag>out.action._attributes.uri=\"http://127.0.0.1:8080/askme\";</tag>";
+          xml += "\n</rule>";
+          xml += "\n</grammar>";
+
+          xml = Regex.Replace(xml, "([^/])SARAH", "$1" + cfg.Name, RegexOptions.IgnoreCase);
+
+      logInfo("GRAMMAR", "DynGrammar: " + xml);
+
+      WSRSpeecGrammar grammar = null;
+      if (Cache.ContainsKey("Dyn")){
+        grammar = Cache["Dyn"];
+      } else {
+        grammar = new WSRSpeecGrammar();
+        grammar.Name = "Dyn";
+        Cache.Add("Dyn", grammar);
+      }
+
+      grammar.XML = xml;
+      grammar.LastModified = DateTime.Now;
+      grammar.Enabled = false;
+
+      foreach (WSRSpeechEngine engine in Engines.Values) {
+        grammar.LoadGrammar(engine);
+      }
+
+      return true;
     }
 
     // ==========================================

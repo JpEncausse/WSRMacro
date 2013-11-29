@@ -138,7 +138,6 @@
     <Content Include="plugins\kinect\kinect.xml" />
     <Content Include="plugins\mail\mail.xml" />
     <Content Include="plugins\meteo\meteo.xml" />
-    <None Include="custom.cpu.ini" />
     <None Include="plugins\movie\movie.tmp">
       <SubType>Designer</SubType>
     </None>
@@ -267,6 +266,7 @@
     <EmbeddedResource Include="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>

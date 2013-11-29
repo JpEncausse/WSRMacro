@@ -44,6 +44,9 @@ namespace net.encausse.sarah {
       // Clean URL
       url = CleanURL(url);
 
+      // Append ClientId
+      url = AppendURL(url, "client", WSRConfig.GetInstance().Id);
+
       // Append UserId
       var profile = WSRProfileManager.GetInstance().Current;
       if (null != profile){

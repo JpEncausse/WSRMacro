@@ -171,22 +171,32 @@ namespace net.encausse.sarah {
       }
 
       // 3. Reset context timeout
-      WSRSpeechManager.GetInstance().ResetContextTimeout();
+      if (rr.Grammar.Name != "Dyn") {
+        WSRSpeechManager.GetInstance().ResetContextTimeout();
+      }
+      else {
+        cfg.logInfo("ENGINE - " + Name, "DYN reset to default context");
+        WSRSpeechManager.GetInstance().SetContext("default");
+        WSRSpeechManager.GetInstance().ForwardContext();
+      }
 
-      // 3.5 Track Audio Pitch
+      // 4. Track Audio Pitch
       TrackPitch(rr);
 
-      // 4. Hook
+      // 5. Reset Speech Buffer
+      WSRSpeakerManager.GetInstance().SpeechBuffer = "";
+
+      // 6. Hook
       String path = cfg.WSR.HandleCustomAttributes(xnav);
 
-      // 5. Parse Result's URL
+      // 7. Parse Result's URL
       String url = GetURL(xnav, rr.Confidence);
 
-      // 6. Parse Result's Dication
+      // 8. Parse Result's Dication
       url = HandleWildcard(rr, url);
       if (url == null) { return;  }
 
-      // 7. Send the request
+      // 9. Send the request
       HandleRequest(url, path);
     }
 
@@ -276,7 +286,7 @@ namespace net.encausse.sarah {
         audioStream.Position = 0;
         var speech2text = WSRSpeechManager.GetInstance().ProcessAudioStream(audioStream, language);
         if (url != null) {
-          url += "&dictation=" + HttpUtility.UrlEncode(speech2text);
+          url += "dictation=" + HttpUtility.UrlEncode(speech2text);
         }
       }
 

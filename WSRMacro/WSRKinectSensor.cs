@@ -320,6 +320,7 @@ namespace net.encausse.sarah {
         MotionWatch.Again();
 
         // Do Job
+        var tmp = StandBy;
         try {
           Motion = DepthManager.CompareDepth(depth1, DepthData);
           Array.Copy(DepthData, depth1, depth1.Length); // Backup
@@ -330,6 +331,9 @@ namespace net.encausse.sarah {
           else if (StandByWatch.Elapsed > WSRConfig.GetInstance().StandBy) {
             StandByWatch.Stop();
             StandBy = true;
+          }
+          if (tmp != StandBy) {
+            WSRHttpManager.GetInstance().SendRequest("http://127.0.0.1:8080/standby?motion=" + !StandBy);
           }
         }
         catch (Exception ex) {
@@ -655,7 +659,7 @@ namespace net.encausse.sarah {
         catch (Exception ex) {
           WSRConfig.GetInstance().logError("FACE", ex);
         }
-        FaceTrackWatch.Stop();
+        FaceTrackWatch.Stop(); 
 
         // Wait to repeat again.
         if (interval > TimeSpan.Zero)

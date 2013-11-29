@@ -62,16 +62,38 @@ namespace net.encausse.sarah {
       }
     }
 
+    public String SpeechBuffer = "";
+    private List<Task> latest = new List<Task>();
     public bool Speak(String tts, bool async) {
+
+      if (Speaking || (!async && latest.Count > 0)) {
+        WSRConfig.GetInstance().logInfo("TTS", "Already speaking ... bypass");
+        return false;
+      }
 
       var name = WSRProfileManager.GetInstance().CurrentName();
       tts = Regex.Replace(tts, "\\[name\\]", name, RegexOptions.IgnoreCase);
 
-      Task last = null;
-      foreach (var speaker in speakers) {
-        last = Task.Factory.StartNew(() => speaker.Speak(tts, async));
+      if (async) {
+        return SpeakAsync(tts);
       }
-      if (!async && null != last) { last.Wait(); }
+
+      lock (latest) {
+        SpeechBuffer += tts + " ";
+        foreach (var speaker in speakers) {
+          latest.Add(Task.Factory.StartNew(() => speaker.Speak(tts, async)));
+        }
+        foreach (var task in latest) { task.Wait(); }
+        latest.Clear();
+        WSRConfig.GetInstance().logInfo("TTS", "Clearing latest ...");
+      }
+      return true;
+    }
+
+    private bool SpeakAsync(String tts) {
+      foreach (var speaker in speakers) {
+        Task.Factory.StartNew(() => speaker.Speak(tts, true));
+      }
       return true;
     }
 
@@ -81,16 +103,42 @@ namespace net.encausse.sarah {
       }
     }
 
-    public bool Play(string fileName) {
+    // ------------------------------------------
+    //  PLAY
+    // ------------------------------------------
+
+    public bool Play(string fileName, bool async) {
+      if (async) { return PlayAsync(fileName);  }
+
+      List<Task> latest = new List<Task>();
       foreach (var speaker in speakers) {
-        Task.Factory.StartNew(() => speaker.Play(fileName));
+        latest.Add(Task.Factory.StartNew(() => speaker.Play(fileName, async)));
       }
+      foreach (var task in latest) { task.Wait(); }
+
       return true;
     }
-
-    public bool Stream(string url) {
+    private bool PlayAsync(string fileName) {
       foreach (var speaker in speakers) {
-        Task.Factory.StartNew(() => speaker.Stream(url));
+        Task.Factory.StartNew(() => speaker.Play(fileName, true));
+      }
+      return true; 
+    }
+
+    public bool Stream(string url, bool async) {
+      if (async) { return StreamAsync(url); }
+
+      List<Task> latest = new List<Task>();
+      foreach (var speaker in speakers) {
+        latest.Add(Task.Factory.StartNew(() => speaker.Stream(url, async)));
+      }
+      foreach (var task in latest) { task.Wait(); }
+
+      return true;
+    }
+    private bool StreamAsync(string url) {
+      foreach (var speaker in speakers) {
+        Task.Factory.StartNew(() => speaker.Stream(url, true));
       }
       return true;
     }
@@ -167,11 +215,12 @@ namespace net.encausse.sarah {
       played.Add(match);
       WSRConfig.GetInstance().logInfo("PLAYER", "[" + device + "]" + "Start Player");
       Stopwatch timer = new Stopwatch(); timer.Start();
+
       using (WaveChannel32 volumeStream = new WaveChannel32(stream)) {
         volumeStream.Volume = match == "TTS" ? WSRConfig.GetInstance().SpkVolTTS / 100f : WSRConfig.GetInstance().SpkVolPlay / 100f;
         WaveOut.Init(volumeStream);
         WaveOut.Play();
-        while (stream.CurrentTime < stream.TotalTime && played.Contains(match) && timer.ElapsedMilliseconds < 1000 * 60 * 2) {
+        while (stream.CurrentTime < stream.TotalTime && played.Contains(match) && timer.ElapsedMilliseconds < 1000 * 60 * 8) {
           Thread.Sleep(100);
         }
         WaveOut.Stop();
@@ -186,14 +235,13 @@ namespace net.encausse.sarah {
     //  SPEECH
     // ==========================================
 
-    public bool speaking = false;
+    public  bool speaking = false;
     public void Speak(String tts, bool async) {
 
       if (tts == null) { return; }
-      if (speaking)    { return; }
+      if (speaking) { return; } speaking = true;
 
       WSRConfig.GetInstance().logInfo("TTS", "[" + device + "] " + "Say: " + tts);
-      speaking = true;
       try {
         // Build and speak a prompt.
         PromptBuilder builder = new PromptBuilder();
@@ -212,6 +260,8 @@ namespace net.encausse.sarah {
       catch (Exception ex) {
         WSRConfig.GetInstance().logError("TTS", ex);
       }
+
+      WSRConfig.GetInstance().logInfo("PLAYER", "[" + device + "]" + "speaking false");
       speaking = false;
     }
 
@@ -232,16 +282,17 @@ namespace net.encausse.sarah {
       return true;
     }
 
-    public void Play(string fileName) {
+    public void Play(string fileName, bool async) {
       if (fileName == null) { return; }
       if (fileName.StartsWith("http")) {
-        Stream(fileName); return;
+        Stream(fileName, async);
+        return;
       }
       if (!File.Exists(fileName)) { return; }
 
       // Play WaveStream
       bool wav = fileName.ToLower().EndsWith(".wav") || fileName.ToLower().EndsWith(".wma");
-      var reader = wav ? (WaveStream)new WaveFileReader(fileName)
+      var reader = wav ? WaveFormatConversionStream.CreatePcmStream(new WaveFileReader(fileName))
                        : (WaveStream)new Mp3FileReader(fileName);
 
       WaveOut WaveOutPlay = new WaveOut(WaveCallbackInfo.FunctionCallback());
@@ -250,7 +301,7 @@ namespace net.encausse.sarah {
       WaveOutPlay.Dispose();
     }
 
-    public void Stream(string url) {
+    public void Stream(string url, bool async) {
       if (url == null) { return; }
 
       WaveOut WaveOutPlay = new WaveOut(WaveCallbackInfo.FunctionCallback());
@@ -266,9 +317,9 @@ namespace net.encausse.sarah {
 
         // Play WaveStream
         bool wav = url.ToLower().EndsWith(".wav") || url.ToLower().EndsWith(".wma");
-        var reader = wav ? (WaveStream)new WaveFileReader(ms)
+        var reader = wav ? WaveFormatConversionStream.CreatePcmStream(new WaveFileReader(ms))
                          : (WaveStream)new Mp3FileReader(ms);
-        
+
         RunSession(WaveOutPlay, reader, url);
       }
 
