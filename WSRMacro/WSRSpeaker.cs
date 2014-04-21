@@ -48,17 +48,17 @@ namespace net.encausse.sarah {
           speakers.Add(new WSRSpeaker(n));
         }
         return;
-      }
-
-      // Enumerate declared Speaker
-      foreach (var spkr in WSRConfig.GetInstance().Speakers.Split(',')) {
-        var idx = int.Parse(spkr);
-        var cap = WaveOut.GetCapabilities(idx);
-        WSRConfig.GetInstance().logInfo("TTS", "Add Speaker Device: " + idx
-                                              + " Product: " + cap.ProductName
-                                              + " Channels: " + cap.Channels
-                                              + " Playback: " + cap.SupportsPlaybackRateControl);
-        speakers.Add(new WSRSpeaker(idx));
+      } else {
+        // Enumerate declared Speaker
+        foreach (var spkr in WSRConfig.GetInstance().Speakers.Split(',')) {
+          var idx = int.Parse(spkr);
+          var cap = WaveOut.GetCapabilities(idx);
+          WSRConfig.GetInstance().logInfo("TTS", "Add Speaker Device: " + idx
+                                                + " Product: " + cap.ProductName
+                                                + " Channels: " + cap.Channels
+                                                + " Playback: " + cap.SupportsPlaybackRateControl);
+          speakers.Add(new WSRSpeaker(idx));
+        }
       }
     }
 
