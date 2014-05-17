@@ -30,22 +30,48 @@ namespace net.encausse.sarah {
       var requestStream = request.GetRequestStream();
       ConvertToFlac(contentToRecognize, requestStream);
 
-      var response = request.GetResponse();
-      var result = "";
-      using (var responseStream = response.GetResponseStream()) {
-        using (var zippedStream = new GZipStream(responseStream, CompressionMode.Decompress)) {
-          using (var sr = new StreamReader(zippedStream)) {
-            result = sr.ReadToEnd();
-            WSRConfig.GetInstance().logInfo("[Google Recognize]", result);
-          }
+      using (var response = request.GetResponse()) {
+        using (var responseStream = response.GetResponseStream()) {
+          using (var zippedStream = new GZipStream(responseStream, CompressionMode.Decompress)) {
+            using (var sr = new StreamReader(zippedStream)) {
+              var results = sr.ReadToEnd().Split('\n');
+              return toJSON(results);
+            }
 
-          // {"result":[{"alternative":[{"transcript":"qu'est-ce que tu fais","confidence":0.77608585},{"transcript":"qu'est-ce que tu fait"}],"final":true}],"result_index":0}
-          JavaScriptSerializer serializer = new JavaScriptSerializer();
-          var json = (IDictionary<string, object>) serializer.DeserializeObject(result);
-          WSRConfig.GetInstance().logInfo("[Google Recognize]", json["result"].ToString());
+            // {"result":[{"alternative":[{"transcript":"qu'est-ce que tu fais","confidence":0.77608585},{"transcript":"qu'est-ce que tu fait"}],"final":true}],"result_index":0}
+            //JavaScriptSerializer serializer = new JavaScriptSerializer();
+            //var json = (IDictionary<string, object>) serializer.DeserializeObject(result);
+            //WSRConfig.GetInstance().logInfo("[Google Recognize]", json["result"].ToString());
+          }
         }
       }
-      response.Close();
+    }
+
+    private String toJSON(string[] response) {
+      JavaScriptSerializer serializer = new JavaScriptSerializer();
+      foreach (var str in response) {
+        if (String.IsNullOrEmpty(str))
+          continue;
+
+        var json = serializer.DeserializeObject(str);
+        if (!(json is IDictionary<string, object>))
+          continue;
+
+        IDictionary<string, object> dict = (IDictionary<string, object>)json;
+
+        var results = (object[])dict["result"];
+        if (results == null || results.Length == 0)
+          continue;
+        var result = (IDictionary<string, object>)results[0];
+
+        var alts = (object[])result["alternative"];
+        if (alts == null || alts.Length == 0)
+          continue;
+        var alt = (IDictionary<string, object>)alts[0];
+
+        WSRConfig.GetInstance().logDebug("[Google Recognize]", "toJSON: " + alt["confidence"] + " : " + alt["transcript"]);
+        return (string)alt["transcript"];
+      }
       return "";
     }
 

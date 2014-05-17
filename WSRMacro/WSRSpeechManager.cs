@@ -463,10 +463,10 @@ namespace net.encausse.sarah {
 
     public String ProcessAudioStream(Stream stream, String language) {
       CultureInfo culture = new System.Globalization.CultureInfo(language);
-      var stt = new SpeechToText("https://www.google.com/speech-api/v2/recognize?output=json&xjerr=1&client=chromium&maxresults=2&key=AIzaSyCnl6MRydhw_5fLXIdASxkLJzcJh5iX0M4", culture);
+      var stt = new SpeechToText("https://www.google.com/speech-api/v2/recognize?output=json&xjerr=1&client=chromium&maxresults=2&key=AIzaSyBOti4mM-6x9WDnZIjIeyEU21OpBXqWBgw", culture);
       return stt.Recognize(stream);
     }
-
+    
     // ==========================================
     //  WSRMacro DUMP AUDIO
     // ==========================================
