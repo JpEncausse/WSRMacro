@@ -39,6 +39,9 @@ namespace net.encausse.sarah {
       WSRSpeechManager.GetInstance().Init();
       InitSpeechEngine();
 
+      // Start Speaker Manager
+      WSRSpeakerManager.GetInstance();
+
       // Start Timeout
       RestartTimeout();
     }

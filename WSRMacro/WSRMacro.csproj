@@ -65,6 +65,7 @@
     <Compile Include="PitchTracker\IIRFilter.cs" />
     <Compile Include="PitchTracker\PitchDsp.cs" />
     <Compile Include="PitchTracker\PitchTracker.cs" />
+    <Compile Include="SpeechToText.cs" />
     <Compile Include="StopwatchAvg.cs" />
     <Compile Include="CodeBits\IniFile.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
@@ -99,6 +100,11 @@
     <Compile Include="WSRWebSocket.cs" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="plugins\demo51\demo51.xml" />
+    <Content Include="plugins\frigo\frigo.xml" />
+    <Content Include="plugins\frigo\frigo2.xml">
+      <SubType>Designer</SubType>
+    </Content>
     <Content Include="profile\haarcascade_frontalface_alt_tree.xml" />
     <Content Include="FaceTrackData.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -241,6 +247,7 @@
     <Reference Include="System.Net" />
     <Reference Include="System.Speech" />
     <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml" />
     <Reference Include="System.XML" />

@@ -69,8 +69,8 @@ namespace net.encausse.sarah {
     public int MaxAlternates = 10;
     public TimeSpan InitialSilenceTimeout      = TimeSpan.FromSeconds(0);
     public TimeSpan BabbleTimeout              = TimeSpan.FromSeconds(0);
-    public TimeSpan EndSilenceTimeout          = TimeSpan.FromSeconds(0);
-    public TimeSpan EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(0);
+    public TimeSpan EndSilenceTimeout          = TimeSpan.FromSeconds(0.150);
+    public TimeSpan EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(0.500);
 
     public bool StandByGesture = false;
     public bool StandByFace    = false;
@@ -240,10 +240,10 @@ namespace net.encausse.sarah {
           else if (property.Key == "gestureSB")    { StandByGesture = bool.Parse(property.Value); }
           else if (property.Key == "faceSB")       { StandByFace = bool.Parse(property.Value); }
           else if (property.Key == "alternate")           { MaxAlternates              = int.Parse(property.Value); }
-          else if (property.Key == "initialSilence")      { InitialSilenceTimeout      = TimeSpan.FromSeconds(int.Parse(property.Value)); }
-          else if (property.Key == "babble")              { BabbleTimeout              = TimeSpan.FromSeconds(int.Parse(property.Value)); }
-          else if (property.Key == "endSilence")          { EndSilenceTimeout          = TimeSpan.FromSeconds(int.Parse(property.Value)); }
-          else if (property.Key == "endSilenceAmbiguous") { EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(int.Parse(property.Value)); }
+          else if (property.Key == "initialSilence")      { InitialSilenceTimeout      = TimeSpan.FromSeconds(double.Parse(property.Value, culture)); }
+          else if (property.Key == "babble")              { BabbleTimeout              = TimeSpan.FromSeconds(double.Parse(property.Value, culture)); }
+          else if (property.Key == "endSilence")          { EndSilenceTimeout          = TimeSpan.FromSeconds(double.Parse(property.Value, culture)); }
+          else if (property.Key == "endSilenceAmbiguous") { EndSilenceTimeoutAmbiguous = TimeSpan.FromSeconds(double.Parse(property.Value, culture)); }
 
         }
       }
@@ -313,7 +313,6 @@ namespace net.encausse.sarah {
       LoggingConfiguration config = new LoggingConfiguration();
       
       // Console ----------
-
       ColoredConsoleTarget consoleTarget = new ColoredConsoleTarget();
       consoleTarget.Layout = "${date:format=HH\\:MM\\:ss} ${logger} ${message}";
 

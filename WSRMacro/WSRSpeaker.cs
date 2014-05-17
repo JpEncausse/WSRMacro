@@ -63,37 +63,53 @@ namespace net.encausse.sarah {
     }
 
     public String SpeechBuffer = "";
-    private List<Task> latest = new List<Task>();
+    private Queue<string> queue = new Queue<String>();
+    
+    private bool working = false;
+    private String Lock = "LOCK";
     public bool Speak(String tts, bool async) {
+      
+      // Run Async
+      if (async) { return SpeakAsync(tts); }
 
-      if (Speaking || (!async && latest.Count > 0)) {
-        WSRConfig.GetInstance().logInfo("TTS", "Already speaking ... bypass");
-        return false;
-      }
-
+      // Compute name
       var name = WSRProfileManager.GetInstance().CurrentName();
       tts = Regex.Replace(tts, "\\[name\\]", name, RegexOptions.IgnoreCase);
 
-      if (async) {
-        return SpeakAsync(tts);
+      WSRConfig.GetInstance().logInfo("TTS", "Try speaking ... " + tts);
+
+      lock (Lock) { 
+        // Prevent multiple Speaking
+        if (Speaking || working) {
+          WSRConfig.GetInstance().logInfo("TTS", "Already speaking ... enqueue");
+          queue.Enqueue(tts); return false;
+        }
+        working = true;
       }
 
-      lock (latest) {
-        SpeechBuffer += tts + " ";
-        foreach (var speaker in speakers) {
-          latest.Add(Task.Factory.StartNew(() => speaker.Speak(tts, async)));
-        }
-        foreach (var task in latest) { task.Wait(); }
-        latest.Clear();
-        WSRConfig.GetInstance().logInfo("TTS", "Clearing latest ...");
+      // Run all speech in a list of Task
+      List<Task> latest = new List<Task>();
+      SpeechBuffer += tts + " ";
+      foreach (var speaker in speakers) {
+        latest.Add(Task.Factory.StartNew(() => speaker.Speak(tts)));
       }
+
+      // Wait for end of Tasks
+      foreach (var task in latest) { task.Wait(); }
+      latest.Clear();
+      lock (Lock) { working = false; }
+      WSRConfig.GetInstance().logInfo("TTS", "End speaking");
+
+      // Dequeue next (always async ...)
+      if (queue.Count > 0) {
+        Speak(queue.Dequeue(), true);
+      }
+
       return true;
     }
 
     private bool SpeakAsync(String tts) {
-      foreach (var speaker in speakers) {
-        Task.Factory.StartNew(() => speaker.Speak(tts, true));
-      }
+      Task.Factory.StartNew(() => Speak(tts, false));
       return true;
     }
 
@@ -236,7 +252,7 @@ namespace net.encausse.sarah {
     // ==========================================
 
     public  bool speaking = false;
-    public void Speak(String tts, bool async) {
+    public void Speak(String tts) {
 
       if (tts == null) { return; }
       if (speaking) { return; } speaking = true;

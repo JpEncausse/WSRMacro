@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using System.Globalization;
 using System.Collections.Generic;
 using System.Xml.XPath;
-using CloudSpeech;
 
 #if MICRO
 using System.Speech;
@@ -96,6 +95,14 @@ namespace net.encausse.sarah {
       engine.Init();
       engine.GetEngine().SetInputToDefaultAudioDevice();
       engine.Start();
+
+
+      var format = engine.GetEngine().AudioFormat;
+      logInfo("ENGINE", "[Default] AudioFormat" + format.EncodingFormat + " channel: " + format.ChannelCount + " AB/S: " + format.AverageBytesPerSecond + " B/S: " + format.BitsPerSample);
+
+      var level = engine.GetEngine().AudioLevel;
+      var state = engine.GetEngine().AudioState;
+      logInfo("ENGINE", "[Default] level: " + level + " state: " + state);
 
       Engines.Add(prefix, engine);
       return engine;
@@ -215,6 +222,13 @@ namespace net.encausse.sarah {
     //  DYNAMIC GRAMMAR
     // ------------------------------------------
 
+    public String ProcessRejected() {
+      if (!Cache.ContainsKey("Dyn")) { return null; }
+      var dyn = Cache["Dyn"];
+      if (dyn.Enabled) { return dyn.Rejected; }
+      return null;
+    } 
+
     public void DynamicGrammar(String[] grammar, String[] tags) {
        if (!LoadXML(grammar,tags)) return;
 
@@ -231,22 +245,29 @@ namespace net.encausse.sarah {
       if (null == g || null == tags) { return false; }
       if (g.Length != tags.Length)   { return false; }
 
+      bool rejected = false;
+      bool garbage = false;
       var xml  = "\n<grammar version=\"1.0\" xml:lang=\""+ cfg.language +"\" mode=\"voice\"  root=\"ruleDyn\" xmlns=\"http://www.w3.org/2001/06/grammar\" tag-format=\"semantics/1.0\">";
           xml += "\n<rule id=\"ruleDyn\" scope=\"public\">";
           xml += "\n<tag>out.action=new Object(); </tag>";
           xml += "\n<one-of>";
           for (var i = 0; i < g.Length; i++) {
             logInfo("GRAMMAR", "Add to DynGrammar: " + g[i] + " => " + tags[i]);
-            xml += "\n<item>" + g[i] + "<tag>out.action.tag=\"" + tags[i] + "\"</tag></item>";
+            if (g[i].IndexOf('*') >= 0) { garbage = true; }
+            if (g[i].Equals("*")) { rejected = true; continue; }
+            xml += "\n<item>" + g[i].Replace("*","<ruleref special=\"GARBAGE\" />") + "<tag>out.action.tag=\"" + tags[i] + "\"</tag></item>";
           }
           xml += "\n</one-of>";
           xml += "\n<tag>out.action._attributes.uri=\"http://127.0.0.1:8080/askme\";</tag>";
+          if (garbage) {
+            xml += "\n<tag>out.action._attributes.dictation=\"true\";</tag>";
+          }
           xml += "\n</rule>";
           xml += "\n</grammar>";
 
           xml = Regex.Replace(xml, "([^/])SARAH", "$1" + cfg.Name, RegexOptions.IgnoreCase);
 
-      logInfo("GRAMMAR", "DynGrammar: " + xml);
+          logInfo("GRAMMAR", "DynGrammar" + (rejected ? " (rejected)" : "") + ":" + xml);
 
       WSRSpeecGrammar grammar = null;
       if (Cache.ContainsKey("Dyn")){
@@ -260,6 +281,7 @@ namespace net.encausse.sarah {
       grammar.XML = xml;
       grammar.LastModified = DateTime.Now;
       grammar.Enabled = false;
+      grammar.Rejected = rejected ? "http://127.0.0.1:8080/askme" : null;
 
       foreach (WSRSpeechEngine engine in Engines.Values) {
         grammar.LoadGrammar(engine);
@@ -362,7 +384,7 @@ namespace net.encausse.sarah {
       foreach (WSRSpeecGrammar g in Cache.Values) {
         if (g.Name == "dictation") { continue; }
         g.Enabled = all || context.Equals(g.Name);
-        logInfo("CONTEXT", g.Name + " = " + g.Enabled);
+        logDebug("CONTEXT", g.Name + " = " + g.Enabled);
       }
     }
 
@@ -400,7 +422,7 @@ namespace net.encausse.sarah {
           WSRSpeecGrammar s = null;
           if (Cache.TryGetValue(g.Name, out s)) {
             g.Enabled = s.Enabled;
-            logInfo("CONTEXT", g.Name + " = " + s.Enabled);
+            logDebug("CONTEXT", g.Name + " = " + s.Enabled);
           }
         }
       }
@@ -440,15 +462,9 @@ namespace net.encausse.sarah {
     // ==========================================
 
     public String ProcessAudioStream(Stream stream, String language) {
-      logInfo("GOOGLE", "ProcessAudioStream: " + language);
       CultureInfo culture = new System.Globalization.CultureInfo(language);
-      var stt = new SpeechToText("https://www.google.com/speech-api/v1/recognize?xjerr=1&client=chromium&maxresults=2", culture);
-      var response = stt.Recognize(stream);
-      foreach (TextResponse res in response) {
-        logInfo("GOOGLE", "Confidence: " + res.Confidence + " Utterance " + res.Utterance);
-        return res.Utterance;
-      }
-      return null;
+      var stt = new SpeechToText("https://www.google.com/speech-api/v2/recognize?output=json&xjerr=1&client=chromium&maxresults=2&key=AIzaSyCnl6MRydhw_5fLXIdASxkLJzcJh5iX0M4", culture);
+      return stt.Recognize(stream);
     }
 
     // ==========================================
@@ -483,6 +499,10 @@ namespace net.encausse.sarah {
 
       // Build XML
       XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
+
+      if (rr.Words.Count <= 0) {
+        return true;
+      }
 
       String xml = "";
       xml += "<match=\"" + rr.Confidence + "\" text\"" + rr.Text + "\">\r\n";
@@ -519,6 +539,7 @@ namespace net.encausse.sarah {
     public String Path { get; set; }
     public bool Enabled { get; set; }
     public DateTime LastModified { get; set; }
+    public String Rejected { get; set; }
 
     public void LoadGrammar(WSRSpeechEngine engine) {
 

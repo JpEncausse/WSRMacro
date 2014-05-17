@@ -22,6 +22,8 @@ WSRMacro/Camera/TrainedFaces
 WSRMacro/plugins
 WSRMacro/profile/faces
 WSRMacro/profile.json
+WSRMacro/Chromeless
+WSRMacro/medias/S*
 
 # External tool builders
 .externalToolBuilders/

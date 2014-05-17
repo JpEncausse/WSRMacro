@@ -44,12 +44,13 @@ namespace net.encausse.sarah {
 
       cfg.logInfo("ENGINE - " + Name, "Init recognizer");
       
-      engine.SpeechRecognized   += new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
-      engine.RecognizeCompleted += new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
-      engine.AudioStateChanged  += new EventHandler<AudioStateChangedEventArgs>(recognizer_AudioStateChanged);
-      engine.SpeechHypothesized += new EventHandler<SpeechHypothesizedEventArgs>(recognizer_SpeechHypothesized);
-      engine.SpeechDetected     += new EventHandler<SpeechDetectedEventArgs>(recognizer_SpeechDetected);
-      
+      engine.SpeechRecognized          += new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
+      engine.RecognizeCompleted        += new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
+      engine.AudioStateChanged         += new EventHandler<AudioStateChangedEventArgs>(recognizer_AudioStateChanged);
+      engine.SpeechHypothesized        += new EventHandler<SpeechHypothesizedEventArgs>(recognizer_SpeechHypothesized);
+      engine.SpeechDetected            += new EventHandler<SpeechDetectedEventArgs>(recognizer_SpeechDetected);
+      engine.SpeechRecognitionRejected += new EventHandler<SpeechRecognitionRejectedEventArgs>(recognizer_SpeechRecognitionRejected);
+
       engine.UpdateRecognizerSetting("CFGConfidenceRejectionThreshold", (int) (this.Confidence * 100));
 
       engine.MaxAlternates              = cfg.MaxAlternates;
@@ -248,17 +249,31 @@ namespace net.encausse.sarah {
       XPathNavigator xnav = rr.ConstructSmlFromSemantics().CreateNavigator();
 
       double confidence = GetConfidence(xnav);
-      if (rr.Confidence < confidence) {
-        cfg.logWarning("ENGINE - "+Name, "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Device: " + " Text: " + rr.Text);
-        return null;
+
+      // Normal check
+      if (rr.Grammar.Name != "Dyn") {
+        if (rr.Confidence < confidence) {
+          cfg.logWarning("ENGINE - " + Name, "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Device: " + " Text: " + rr.Text);
+          return null;
+        }
+
+        if (rr.Words[0].Confidence < cfg.trigger) {
+          cfg.logWarning("ENGINE - " + Name, "REJECTED Trigger: " + rr.Words[0].Confidence + " Text: " + rr.Words[0].Text);
+          return null;
+        }
       }
 
-      if (rr.Words[0].Confidence < cfg.trigger) {
-        cfg.logWarning("ENGINE - "+Name, "REJECTED Trigger: " + rr.Words[0].Confidence + " Text: " + rr.Words[0].Text);
-        return null;
+      // Dynamic check
+      else {
+        confidence = confidence - 0.2;
+        cfg.logInfo("ENGINE - " + Name + " - DYN","Dynamic Grammar");
+        if (rr.Confidence < (confidence)) {
+          cfg.logWarning("ENGINE - " + Name + " - DYN", "REJECTED Speech: " + rr.Confidence + " < " + confidence + " Device: " + " Text: " + rr.Text);
+          return null;
+        } 
       }
 
-      cfg.logWarning("ENGINE - "+Name, "RECOGNIZED Speech: " + rr.Confidence + " / " + rr.Words[0].Confidence + " (" + rr.Words[0].Text + ")" + " Device: " + " Text: " + rr.Text);
+      cfg.logWarning("ENGINE - " + Name, "RECOGNIZED Speech: " + rr.Confidence + " (" + confidence + ") / " + rr.Words[0].Confidence + " (" + rr.Words[0].Text + ")" + " Device: " + " Text: " + rr.Text);
       cfg.logDebug("ENGINE - "+Name, xnav.OuterXml);
 
       if (cfg.DEBUG) { WSRSpeechManager.GetInstance().DumpAudio(rr); } 
@@ -280,17 +295,23 @@ namespace net.encausse.sarah {
       }
 
       // Google
+      var speech2text = ProcessAudioStream(rr, language);
+      if (url != null) {
+        url += "dictation=" + HttpUtility.UrlEncode(speech2text);
+      }
+
+      return url;
+    }
+
+    protected String ProcessAudioStream(RecognitionResult rr, String language) {
+      cfg.logInfo("GOOGLE", "ProcessAudioStream: " + language + " " + rr.Audio.Duration);
       using (MemoryStream audioStream = new MemoryStream()) {
         rr.Audio.WriteToWaveStream(audioStream);
         // rr.GetAudioForWordRange(rr.Words[word], rr.Words[word]).WriteToWaveStream(audioStream);
         audioStream.Position = 0;
-        var speech2text = WSRSpeechManager.GetInstance().ProcessAudioStream(audioStream, language);
-        if (url != null) {
-          url += "dictation=" + HttpUtility.UrlEncode(speech2text);
-        }
+        // WSRSpeechManager.GetInstance().DumpAudio(rr);
+        return WSRSpeechManager.GetInstance().ProcessAudioStream(audioStream, language);
       }
-
-      return url;
     }
 
     // ==========================================
@@ -337,12 +358,43 @@ namespace net.encausse.sarah {
       cfg.logDebug("ENGINE - " + Name, "AudioStateChanged (" + DateTime.Now.ToString("mm:ss.f") + "):" + e.AudioState);
     }
     protected void recognizer_SpeechHypothesized(object sender, SpeechHypothesizedEventArgs e) {
-      cfg.logDebug("ENGINE - " + Name, "recognizer_SpeechHypothesized " + e.Result.Text + " => " + e.Result.Confidence);
-      
+      cfg.logInfo("ENGINE - " + Name, "recognizer_SpeechHypothesized " + e.Result.Text + " => " + e.Result.Confidence);
     }
     protected void recognizer_SpeechDetected(object sender, SpeechDetectedEventArgs e) {
       cfg.logDebug("ENGINE - " + Name, "recognizer_SpeechDetected");
     }
+
+    protected void recognizer_SpeechRecognitionRejected(object sender, SpeechRecognitionRejectedEventArgs e) {
+
+      var url = WSRSpeechManager.GetInstance().ProcessRejected();
+      if (url == null) { return; }
+
+      // 1. Prevent while speaking
+      if (WSRSpeakerManager.GetInstance().Speaking) {
+        cfg.logWarning("ENGINE - " + Name, "REJECTED Speech while speaking (in SpeechRecognitionRejected)");
+        return;
+      }
+
+      // 2. Process Audio
+      cfg.logInfo("ENGINE - " + Name, "DYN process speech2text: ...");
+      String speech2text = ProcessAudioStream(e.Result, WSRConfig.GetInstance().language);
+      
+
+      if (String.IsNullOrEmpty(speech2text)) {
+        cfg.logInfo("ENGINE - " + Name, "DYN wrong speech2text: " + speech2text);
+        return; 
+      }
+
+      // 3. Reset Dynamic
+      cfg.logInfo("ENGINE - " + Name, "DYN reset to default context (in SpeechRecognitionRejected)");
+      WSRSpeechManager.GetInstance().SetContext("default");
+      WSRSpeechManager.GetInstance().ForwardContext();
+
+      // 4. Send back request
+      cfg.logInfo("ENGINE - " + Name, "DYN callback: " + speech2text);
+      url += "?dictation=" + HttpUtility.UrlEncode(speech2text);
+      HandleRequest(url, null);
+    } 
 
     // ==========================================
     //  START / STOP
