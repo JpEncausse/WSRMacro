@@ -48,6 +48,9 @@ namespace net.encausse.sarah {
 
     public bool SpeechOnly = false;
 
+    // Google
+    public String GoogleKey { get; set; }
+
     // Grammar
     public int ctxTimeout = 30000;
     public List<string> directories = new List<string>();
@@ -212,6 +215,7 @@ namespace net.encausse.sarah {
           else if (property.Key == "server")       { server      = property.Value; }
           else if (property.Key == "port")         { port        = property.Value; }
           else if (property.Key == "speakers")     { Speakers    = property.Value; }
+          else if (property.Key == "google")       { GoogleKey = property.Value;   }
           else if (property.Key == "only")         { SpeechOnly = bool.Parse(property.Value); }
           else if (property.Key == "spVolTTS")     { SpkVolTTS   = int.Parse(property.Value);  }
           else if (property.Key == "spVolPlay")    { SpkVolPlay  = int.Parse(property.Value);  }

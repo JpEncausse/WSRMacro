@@ -117,7 +117,7 @@ namespace net.encausse.sarah {
     public void RecognizeString(String text) { 
 
       WSRSpeechEngine fileEngine = Engines["File"];
-      // fileEngine.GetEngine().EmulateRecognize(text);
+      //fileEngine.GetEngine().EmulateRecognize(text);
       fileEngine.GetEngine().SimulateRecognize(text);
     }
 
@@ -463,7 +463,13 @@ namespace net.encausse.sarah {
 
     public String ProcessAudioStream(Stream stream, String language) {
       CultureInfo culture = new System.Globalization.CultureInfo(language);
-      var stt = new SpeechToText("https://www.google.com/speech-api/v2/recognize?output=json&xjerr=1&client=chromium&maxresults=2&key=AIzaSyBOti4mM-6x9WDnZIjIeyEU21OpBXqWBgw", culture);
+      var key = WSRConfig.GetInstance().GoogleKey;
+      if (key == null) {
+        WSRConfig.GetInstance().logError("GOOGLE", "Missing Google Key required for the Google API v2 from https://console.developers.google.com/");
+        return "No key for Google API";
+      }
+
+      var stt = new SpeechToText("https://www.google.com/speech-api/v2/recognize?output=json&xjerr=1&client=chromium&maxresults=2&key="+key, culture);
       return stt.Recognize(stream);
     }
     

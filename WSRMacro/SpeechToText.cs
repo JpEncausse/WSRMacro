@@ -16,16 +16,12 @@ namespace net.encausse.sarah {
   public class SpeechToText {
     private string endpointAddress;
 
-    public SpeechToText()
-      : this("https://www.google.com/speech-api/v2/recognize?xjerr=1&client=chromium", CultureInfo.CurrentCulture) {
-    }
-
     public SpeechToText(string endpointAddress, CultureInfo culture) {
       this.endpointAddress = endpointAddress + "&lang=" + culture.Name;
     }
 
     public String Recognize(Stream contentToRecognize) {
-      var request = (HttpWebRequest)WebRequest.Create(this.endpointAddress + "&maxresults=6&pfilter=2");
+      var request = (HttpWebRequest)WebRequest.Create(this.endpointAddress);
       ConfigureRequest(request);
       var requestStream = request.GetRequestStream();
       ConvertToFlac(contentToRecognize, requestStream);
